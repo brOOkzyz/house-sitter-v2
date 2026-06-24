@@ -1,0 +1,13 @@
+# Internal AI/Codex instructions and handoff notes
+AGENTS.md
+agent.md
+**/AGENTS.md
+**/agent.md
+docs/session_handoff.md
+**/session_handoff.md
+**/*handoff*.md
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo

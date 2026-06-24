@@ -1,0 +1,15 @@
+{
+  "schema_version": "1.0",
+  "frame_id": "map",
+  "mock_only": true,
+  "waypoint_notes": {
+    "nearby_test": "Placeholder only. Before real navigation, replace this pose with a nearby safe pose derived from the current /amcl_pose."
+  },
+  "waypoints": {
+    "start": {"x": 0.0, "y": 0.0, "yaw": 0.0},
+    "hallway": {"x": 2.0, "y": 0.0, "yaw": 0.0},
+    "living_room": {"x": 4.0, "y": 1.5, "yaw": 1.57},
+    "nearby_test": {"x": 0.419256, "y": -0.005660, "yaw": 0.000711}
+  }
+}
+

@@ -1,0 +1,42 @@
+[INFO] [1782058292.985698126] [tf2_echo]: Waiting for transform map ->  odom: Invalid frame ID "map" passed to canTransform argument target_frame - frame does not exist
+At time 17.146000000
+- Translation: [0.019, -0.006, 0.000]
+- Rotation: in Quaternion (xyzw) [0.000, 0.000, 0.000, 1.000]
+- Rotation: in RPY (radian) [0.000, -0.000, 0.001]
+- Rotation: in RPY (degree) [0.000, -0.000, 0.041]
+- Matrix:
+  1.000 -0.001  0.000  0.019
+  0.001  1.000  0.000 -0.006
+  0.000  0.000  1.000  0.000
+  0.000  0.000  0.000  1.000
+At time 18.121000000
+- Translation: [0.019, -0.006, 0.000]
+- Rotation: in Quaternion (xyzw) [0.000, 0.000, 0.000, 1.000]
+- Rotation: in RPY (radian) [0.000, -0.000, 0.001]
+- Rotation: in RPY (degree) [0.000, -0.000, 0.041]
+- Matrix:
+  1.000 -0.001  0.000  0.019
+  0.001  1.000  0.000 -0.006
+  0.000  0.000  1.000  0.000
+  0.000  0.000  0.000  1.000
+At time 19.114000000
+- Translation: [0.019, -0.006, 0.000]
+- Rotation: in Quaternion (xyzw) [0.000, 0.000, 0.000, 1.000]
+- Rotation: in RPY (radian) [0.000, -0.000, 0.001]
+- Rotation: in RPY (degree) [0.000, -0.000, 0.041]
+- Matrix:
+  1.000 -0.001  0.000  0.019
+  0.001  1.000  0.000 -0.006
+  0.000  0.000  1.000  0.000
+  0.000  0.000  0.000  1.000
+At time 20.89000000
+- Translation: [0.019, -0.006, 0.000]
+- Rotation: in Quaternion (xyzw) [0.000, 0.000, 0.000, 1.000]
+- Rotation: in RPY (radian) [0.000, -0.000, 0.001]
+- Rotation: in RPY (degree) [0.000, -0.000, 0.041]
+- Matrix:
+  1.000 -0.001  0.000  0.019
+  0.001  1.000  0.000 -0.006
+  0.000  0.000  1.000  0.000
+  0.000  0.000  0.000  1.000
+[INFO] [1782058297.632828664] [rclcpp]: signal_handler(SIGINT/SIGTERM)

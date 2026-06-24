@@ -1,0 +1,84 @@
+[INFO] [launch]: All log files can be found below /home/brookz/.ros/log/2026-06-21-16-09-17-125681-brookz-Lenovo-Legion-R9000P2021H-14085
+[INFO] [launch]: Default logging verbosity is set to INFO
+[INFO] [map_server-1]: process started with pid [14089]
+[INFO] [amcl-2]: process started with pid [14090]
+[INFO] [lifecycle_manager-3]: process started with pid [14091]
+[lifecycle_manager-3] [INFO] [1782054557.347803031] [lifecycle_manager_localization]: Creating
+[lifecycle_manager-3] [INFO] [1782054557.353797493] [lifecycle_manager_localization]: [34m[1mCreating and initializing lifecycle service clients[0m[0m
+[amcl-2] [INFO] [1782054557.360263448] [amcl]: 
+[amcl-2] 	amcl lifecycle node launched. 
+[amcl-2] 	Waiting on external lifecycle transitions to activate
+[amcl-2] 	See https://design.ros2.org/articles/node_lifecycle.html for more information.
+[amcl-2] [INFO] [1782054557.361664793] [amcl]: Creating
+[map_server-1] [INFO] [1782054557.374398495] [map_server]: 
+[map_server-1] 	map_server lifecycle node launched. 
+[map_server-1] 	Waiting on external lifecycle transitions to activate
+[map_server-1] 	See https://design.ros2.org/articles/node_lifecycle.html for more information.
+[map_server-1] [INFO] [1782054557.374548512] [map_server]: Creating
+[lifecycle_manager-3] [INFO] [1782054557.535850469] [lifecycle_manager_localization]: [34m[1mStarting managed nodes bringup...[0m[0m
+[lifecycle_manager-3] [INFO] [1782054557.535911439] [lifecycle_manager_localization]: [34m[1mConfiguring map_server[0m[0m
+[map_server-1] [INFO] [1782054557.682433374] [map_server]: Configuring
+[map_server-1] [INFO] [1782054557.682501888] [map_io]: Loading yaml file: /home/brookz/create3_ws/house_sitter_v2/maps/minimal_slam_map.yaml
+[map_server-1] [INFO] [1782054557.682710012] [map_io]: resolution: 0.05
+[map_server-1] [INFO] [1782054557.682724399] [map_io]: origin[0]: -11.276
+[map_server-1] [INFO] [1782054557.682730196] [map_io]: origin[1]: -10.741
+[map_server-1] [INFO] [1782054557.682735434] [map_io]: origin[2]: 0
+[map_server-1] [INFO] [1782054557.682741021] [map_io]: free_thresh: 0.196
+[map_server-1] [INFO] [1782054557.682745770] [map_io]: occupied_thresh: 0.65
+[map_server-1] [INFO] [1782054557.682751427] [map_io]: mode: trinary
+[map_server-1] [INFO] [1782054557.682757084] [map_io]: negate: 0
+[map_server-1] [INFO] [1782054557.682909476] [map_io]: Loading image_file: /home/brookz/create3_ws/house_sitter_v2/maps/minimal_slam_map.pgm
+[map_server-1] [INFO] [1782054557.693209871] [map_io]: Read map /home/brookz/create3_ws/house_sitter_v2/maps/minimal_slam_map.pgm: 449 X 441 map @ 0.05 m/cell
+[lifecycle_manager-3] [INFO] [1782054557.705830641] [lifecycle_manager_localization]: [34m[1mConfiguring amcl[0m[0m
+[amcl-2] [INFO] [1782054557.706106371] [amcl]: Configuring
+[amcl-2] [INFO] [1782054557.706304298] [amcl]: initTransforms
+[amcl-2] [INFO] [1782054557.715548709] [amcl]: initPubSub
+[amcl-2] [INFO] [1782054557.733167040] [amcl]: Subscribed to map topic.
+[lifecycle_manager-3] [INFO] [1782054557.740847308] [lifecycle_manager_localization]: [34m[1mActivating map_server[0m[0m
+[map_server-1] [INFO] [1782054557.741023515] [map_server]: Activating
+[map_server-1] [INFO] [1782054557.741531813] [map_server]: Creating bond (map_server) to lifecycle manager.
+[amcl-2] [INFO] [1782054557.742025234] [amcl]: Received a 449 X 441 map @ 0.050 m/pix
+[lifecycle_manager-3] [INFO] [1782054557.848785483] [lifecycle_manager_localization]: Server map_server connected with bond.
+[lifecycle_manager-3] [INFO] [1782054557.848823267] [lifecycle_manager_localization]: [34m[1mActivating amcl[0m[0m
+[amcl-2] [INFO] [1782054557.849104583] [amcl]: Activating
+[amcl-2] [INFO] [1782054557.849150678] [amcl]: Creating bond (amcl) to lifecycle manager.
+[lifecycle_manager-3] [INFO] [1782054557.954188595] [lifecycle_manager_localization]: Server amcl connected with bond.
+[lifecycle_manager-3] [INFO] [1782054557.954260531] [lifecycle_manager_localization]: [34m[1mManaged nodes are active[0m[0m
+[lifecycle_manager-3] [INFO] [1782054557.954283020] [lifecycle_manager_localization]: [34m[1mCreating bond timer...[0m[0m
+[amcl-2] [INFO] [1782054561.465662847] [amcl]: createLaserObject
+[amcl-2] [WARN] [1782054561.494310776] [amcl]: AMCL cannot publish a pose or update the transform. Please set the initial pose...
+[amcl-2] [WARN] [1782054563.576986876] [amcl]: AMCL cannot publish a pose or update the transform. Please set the initial pose...
+[amcl-2] [WARN] [1782054565.663188679] [amcl]: AMCL cannot publish a pose or update the transform. Please set the initial pose...
+[amcl-2] [WARN] [1782054567.719917209] [amcl]: AMCL cannot publish a pose or update the transform. Please set the initial pose...
+[amcl-2] [WARN] [1782054569.761950113] [amcl]: AMCL cannot publish a pose or update the transform. Please set the initial pose...
+[amcl-2] [WARN] [1782054571.808172624] [amcl]: AMCL cannot publish a pose or update the transform. Please set the initial pose...
+[amcl-2] [WARN] [1782054573.837049491] [amcl]: AMCL cannot publish a pose or update the transform. Please set the initial pose...
+[amcl-2] [INFO] [1782054575.266780018] [amcl]: initialPoseReceived
+[amcl-2] [WARN] [1782054575.267113714] [amcl]: Failed to transform initial pose in time (Lookup would require extrapolation into the future.  Requested time 20.499000 but the latest data is at time 20.487000, when looking up transform from frame [base_link] to frame [odom])
+[amcl-2] [INFO] [1782054575.267148565] [amcl]: Setting pose (20.499000): 0.000 0.000 0.000
+[amcl-2] [INFO] [1782054583.421424408] [amcl]: Message Filter dropping message: frame 'turtlebot4/rplidar_link/rplidar' at time 28.113 for reason 'discarding message because the queue is full'
+[amcl-2] [INFO] [1782054604.791680748] [amcl]: Message Filter dropping message: frame 'turtlebot4/rplidar_link/rplidar' at time 45.474 for reason 'discarding message because the queue is full'
+[amcl-2] [INFO] [1782054610.787380499] [amcl]: Message Filter dropping message: frame 'turtlebot4/rplidar_link/rplidar' at time 50.832 for reason 'discarding message because the queue is full'
+[amcl-2] [INFO] [1782054625.380269656] [amcl]: Message Filter dropping message: frame 'turtlebot4/rplidar_link/rplidar' at time 63.921 for reason 'discarding message because the queue is full'
+[amcl-2] [INFO] [1782055158.083823610] [amcl]: Message Filter dropping message: frame 'turtlebot4/rplidar_link/rplidar' at time 579.075 for reason 'the timestamp on the message is earlier than all the data in the transform cache'
+[lifecycle_manager-3] [INFO] [1782056946.301733602] [rclcpp]: signal_handler(SIGINT/SIGTERM)
+[lifecycle_manager-3] [INFO] [1782056946.301801347] [lifecycle_manager_localization]: Running Nav2 LifecycleManager rcl preshutdown (lifecycle_manager_localization)
+[lifecycle_manager-3] [INFO] [1782056946.301840528] [lifecycle_manager_localization]: [34m[1mTerminating bond timer...[0m[0m
+[amcl-2] [INFO] [1782056946.304957099] [rclcpp]: signal_handler(SIGINT/SIGTERM)
+[amcl-2] [INFO] [1782056946.305029454] [amcl]: Running Nav2 LifecycleNode rcl preshutdown (amcl)
+[amcl-2] [INFO] [1782056946.305095733] [amcl]: Deactivating
+[amcl-2] [INFO] [1782056946.305121504] [amcl]: Destroying bond (amcl) to lifecycle manager.
+[map_server-1] [INFO] [1782056946.306636209] [rclcpp]: signal_handler(SIGINT/SIGTERM)
+[map_server-1] [INFO] [1782056946.306709751] [map_server]: Running Nav2 LifecycleNode rcl preshutdown (map_server)
+[map_server-1] [INFO] [1782056946.309580203] [map_server]: Deactivating
+[map_server-1] [INFO] [1782056946.309617498] [map_server]: Destroying bond (map_server) to lifecycle manager.
+[amcl-2] [INFO] [1782056946.355407500] [amcl]: Cleaning up
+[map_server-1] [INFO] [1782056946.359949170] [map_server]: Cleaning up
+[map_server-1] [INFO] [1782056946.360008255] [map_server]: Destroying bond (map_server) to lifecycle manager.
+[map_server-1] [INFO] [1782056946.474209449] [map_server]: Destroying
+[lifecycle_manager-3] [INFO] [1782056946.510017609] [lifecycle_manager_localization]: Destroying lifecycle_manager_localization
+[amcl-2] [INFO] [1782056946.658599489] [amcl]: Destroying bond (amcl) to lifecycle manager.
+[INFO] [lifecycle_manager-3]: process has finished cleanly [pid 14091]
+[INFO] [map_server-1]: process has finished cleanly [pid 14089]
+[amcl-2] [INFO] [1782056946.667574577] [amcl]: Destroying
+[INFO] [amcl-2]: process has finished cleanly [pid 14090]

@@ -1,0 +1,223 @@
+[INFO] [launch]: All log files can be found below /home/brookz/.ros/log/2026-06-21-16-52-09-981446-brookz-Lenovo-Legion-R9000P2021H-19166
+[INFO] [launch]: Default logging verbosity is set to INFO
+[INFO] [gazebo-1]: process started with pid [19172]
+[INFO] [parameter_bridge-2]: process started with pid [19173]
+[INFO] [robot_state_publisher-3]: process started with pid [19174]
+[INFO] [joint_state_publisher-4]: process started with pid [19175]
+[INFO] [robot_state_publisher-5]: process started with pid [19177]
+[INFO] [static_transform_publisher-6]: process started with pid [19178]
+[INFO] [create-7]: process started with pid [19179]
+[INFO] [create-8]: process started with pid [19180]
+[INFO] [parameter_bridge-9]: process started with pid [19181]
+[INFO] [parameter_bridge-10]: process started with pid [19182]
+[INFO] [parameter_bridge-11]: process started with pid [19183]
+[INFO] [parameter_bridge-12]: process started with pid [19184]
+[INFO] [parameter_bridge-13]: process started with pid [19185]
+[INFO] [parameter_bridge-14]: process started with pid [19186]
+[INFO] [parameter_bridge-15]: process started with pid [19187]
+[INFO] [parameter_bridge-16]: process started with pid [19188]
+[INFO] [parameter_bridge-17]: process started with pid [19189]
+[INFO] [parameter_bridge-18]: process started with pid [19190]
+[INFO] [parameter_bridge-19]: process started with pid [19191]
+[INFO] [parameter_bridge-20]: process started with pid [19196]
+[INFO] [parameter_bridge-21]: process started with pid [19197]
+[INFO] [parameter_bridge-22]: process started with pid [19200]
+[INFO] [parameter_bridge-23]: process started with pid [19201]
+[INFO] [parameter_bridge-24]: process started with pid [19202]
+[INFO] [parameter_bridge-25]: process started with pid [19203]
+[INFO] [parameter_bridge-26]: process started with pid [19204]
+[INFO] [parameter_bridge-27]: process started with pid [19207]
+[INFO] [parameter_bridge-28]: process started with pid [19208]
+[INFO] [parameter_bridge-29]: process started with pid [19209]
+[INFO] [turtlebot4_node-30]: process started with pid [19212]
+[INFO] [turtlebot4_gz_hmi_node-31]: process started with pid [19215]
+[INFO] [spawner-32]: process started with pid [19223]
+[INFO] [hazards_vector_publisher-33]: process started with pid [19224]
+[INFO] [ir_intensity_vector_publisher-34]: process started with pid [19227]
+[INFO] [motion_control-35]: process started with pid [19231]
+[INFO] [wheel_status_publisher-36]: process started with pid [19235]
+[INFO] [mock_publisher-37]: process started with pid [19236]
+[INFO] [robot_state-38]: process started with pid [19246]
+[INFO] [kidnap_estimator_publisher-39]: process started with pid [19253]
+[INFO] [ui_mgr-40]: process started with pid [19255]
+[INFO] [pose_republisher_node-41]: process started with pid [19263]
+[INFO] [sensors_node-42]: process started with pid [19271]
+[INFO] [interface_buttons_node-43]: process started with pid [19272]
+[INFO] [static_transform_publisher-44]: process started with pid [19275]
+[INFO] [static_transform_publisher-45]: process started with pid [19283]
+[static_transform_publisher-6] [WARN] [1782057130.863718647] []: Old-style arguments are deprecated; see --help for new-style arguments
+[robot_state_publisher-3] [WARN] [1782057130.960926555] [kdl_parser]: The root link base_link has an inertia specified in the URDF, but KDL does not support a root link with an inertia.  As a workaround, you can add an extra dummy link to your URDF.
+[robot_state_publisher-3] [INFO] [1782057130.961728745] [robot_state_publisher]: Robot initialized
+[static_transform_publisher-44] [WARN] [1782057131.000405934] []: Old-style arguments are deprecated; see --help for new-style arguments
+[parameter_bridge-13] [INFO] [1782057131.004858344] [cliff_front_left_bridge]: Creating GZ->ROS Bridge: [/world/warehouse/model/turtlebot4/link/base_link/sensor/cliff_front_left/scan (gz.msgs.LaserScan) -> /world/warehouse/model/turtlebot4/link/base_link/sensor/cliff_front_left/scan (sensor_msgs/msg/LaserScan)] (Lazy 0)
+[static_transform_publisher-45] [WARN] [1782057131.111059073] []: Old-style arguments are deprecated; see --help for new-style arguments
+[gazebo-1] [1;32m[Msg] [0m[1;32mGazebo Sim GUI    v[0m[1;32m8.11.0[0m[1;32m[0m
+[gazebo-1] [1;36m[Dbg] [gz.cc:166] [0m[1;36mSubscribing to [[0m[1;36m/gazebo/starting_world[0m[1;36m].[0m[1;36m[0m
+[gazebo-1] [1;36m[Dbg] [gz.cc:168] [0m[1;36mWaiting for a world to be set from the GUI...[0m[1;36m[0m
+[gazebo-1] [1;36m[Dbg] [Gui.cc:275] [0m[1;36mWaiting for subscribers to [[0m[1;36m/gazebo/starting_world[0m[1;36m]...[0m[1;36m[0m
+[parameter_bridge-12] [INFO] [1782057131.393169801] [bumper_contact_bridge]: Creating GZ->ROS Bridge: [/bumper_contact (gz.msgs.Contacts) -> /bumper_contact (ros_gz_interfaces/msg/Contacts)] (Lazy 0)
+[gazebo-1] [1;36m[Dbg] [Application.cc:96] [0m[1;36mInitializing application.[0m[1;36m[0m
+[gazebo-1] [1;36m[Dbg] [Application.cc:170] [0m[1;36mQt using OpenGL graphics interface[0m[1;36m[0m
+[gazebo-1] [1;36m[GUI] [Dbg] [Application.cc:657] [0m[1;36mCreate main window[0m[1;36m[0m
+[static_transform_publisher-6] [INFO] [1782057131.612065600] [tf_odom_std_dock_link_publisher]: Spinning until stopped - publishing transform
+[static_transform_publisher-6] translation: ('0.157000', '0.000000', '0.000000')
+[static_transform_publisher-6] rotation: ('0.000000', '0.000000', '1.000000', '0.000000')
+[static_transform_publisher-6] from 'odom' to 'std_dock_link'
+[robot_state_publisher-5] [WARN] [1782057131.675954562] [kdl_parser]: The root link std_dock_link has an inertia specified in the URDF, but KDL does not support a root link with an inertia.  As a workaround, you can add an extra dummy link to your URDF.
+[robot_state_publisher-5] [INFO] [1782057131.680170422] [dock_state_publisher]: Robot initialized
+[create-7] [INFO] [1782057131.895289169] [ros_gz_sim]: Requesting list of world names.
+[ir_intensity_vector_publisher-34] [INFO] [1782057131.927336875] [ir_intensity_vector_publisher]: Advertised topic: ir_intensity
+[ir_intensity_vector_publisher-34] [INFO] [1782057131.950007147] [ir_intensity_vector_publisher]: Subscription to topic: _internal/ir_intensity_front_center_left
+[gazebo-1] [1;33m[GUI] [Wrn] [Application.cc:908] [0m[1;33m[QT] file:///usr/lib/x86_64-linux-gnu/qt5/qml/QtQuick/Dialogs/DefaultFileDialog.qml:413:17: QML ToolButton: Binding loop detected for property "implicitHeight"[0m[1;33m[0m
+[gazebo-1] [1;33m[GUI] [Wrn] [Application.cc:908] [0m[1;33m[QT] file:///usr/lib/x86_64-linux-gnu/qt5/qml/QtQuick/Dialogs/DefaultFileDialog.qml:309:21: QML Button: Binding loop detected for property "implicitHeight"[0m[1;33m[0m
+[gazebo-1] [1;33m[GUI] [Wrn] [Application.cc:908] [0m[1;33m[QT] file:///usr/lib/x86_64-linux-gnu/qt5/qml/QtQuick/Dialogs/DefaultFileDialog.qml:309:21: QML Button: Binding loop detected for property "implicitHeight"[0m[1;33m[0m
+[gazebo-1] [1;33m[GUI] [Wrn] [Application.cc:908] [0m[1;33m[QT] file:///usr/lib/x86_64-linux-gnu/qt5/qml/QtQuick/Dialogs/DefaultFileDialog.qml:413:17: QML ToolButton: Binding loop detected for property "implicitHeight"[0m[1;33m[0m
+[gazebo-1] [1;33m[GUI] [Wrn] [Application.cc:908] [0m[1;33m[QT] file:///usr/lib/x86_64-linux-gnu/qt5/qml/QtQuick/Dialogs/DefaultFileDialog.qml:309:21: QML Button: Binding loop detected for property "implicitHeight"[0m[1;33m[0m
+[gazebo-1] [1;33m[GUI] [Wrn] [Application.cc:908] [0m[1;33m[QT] file:///usr/lib/x86_64-linux-gnu/qt5/qml/QtQuick/Dialogs/DefaultFileDialog.qml:309:21: QML Button: Binding loop detected for property "implicitHeight"[0m[1;33m[0m
+[ir_intensity_vector_publisher-34] [INFO] [1782057132.029595168] [ir_intensity_vector_publisher]: Subscription to topic: _internal/ir_intensity_front_center_right
+[gazebo-1] [1;36m[GUI] [Dbg] [PathManager.cc:68] [0m[1;36mRequesting resource paths through [[0m[1;36m/gazebo/resource_paths/get[0m[1;36m][0m[1;36m[0m
+[gazebo-1] [1;33m[GUI] [Wrn] [Application.cc:908] [0m[1;33m[QT] file:///usr/lib/x86_64-linux-gnu/qt5/qml/QtQuick/Dialogs/DefaultFileDialog.qml:413:17: QML ToolButton: Binding loop detected for property "implicitHeight"[0m[1;33m[0m
+[gazebo-1] [1;33m[GUI] [Wrn] [Application.cc:908] [0m[1;33m[QT] file:///usr/lib/x86_64-linux-gnu/qt5/qml/QtQuick/Dialogs/DefaultFileDialog.qml:309:21: QML Button: Binding loop detected for property "implicitHeight"[0m[1;33m[0m
+[gazebo-1] [1;33m[GUI] [Wrn] [Application.cc:908] [0m[1;33m[QT] file:///usr/lib/x86_64-linux-gnu/qt5/qml/QtQuick/Dialogs/DefaultFileDialog.qml:309:21: QML Button: Binding loop detected for property "implicitHeight"[0m[1;33m[0m
+[gazebo-1] [1;36m[GUI] [Dbg] [Gui.cc:355] [0m[1;36mGUI requesting list of world names. The server may be busy [0m[1;36mdownloading resources. Please be patient.[0m[1;36m[0m
+[parameter_bridge-14] [INFO] [1782057132.321230903] [cliff_front_right_bridge]: Creating GZ->ROS Bridge: [/world/warehouse/model/turtlebot4/link/base_link/sensor/cliff_front_right/scan (gz.msgs.LaserScan) -> /world/warehouse/model/turtlebot4/link/base_link/sensor/cliff_front_right/scan (sensor_msgs/msg/LaserScan)] (Lazy 0)
+[ir_intensity_vector_publisher-34] [INFO] [1782057132.698212809] [ir_intensity_vector_publisher]: Subscription to topic: _internal/ir_intensity_front_left
+[ir_intensity_vector_publisher-34] [INFO] [1782057132.707306899] [ir_intensity_vector_publisher]: Subscription to topic: _internal/ir_intensity_front_right
+[ir_intensity_vector_publisher-34] [INFO] [1782057132.708724524] [ir_intensity_vector_publisher]: Subscription to topic: _internal/ir_intensity_left
+[ir_intensity_vector_publisher-34] [INFO] [1782057132.730429878] [ir_intensity_vector_publisher]: Subscription to topic: _internal/ir_intensity_right
+[ir_intensity_vector_publisher-34] [INFO] [1782057132.733446226] [ir_intensity_vector_publisher]: Subscription to topic: _internal/ir_intensity_side_left
+[parameter_bridge-16] [INFO] [1782057132.839504619] [cliff_side_right_bridge]: Creating GZ->ROS Bridge: [/world/warehouse/model/turtlebot4/link/base_link/sensor/cliff_side_right/scan (gz.msgs.LaserScan) -> /world/warehouse/model/turtlebot4/link/base_link/sensor/cliff_side_right/scan (sensor_msgs/msg/LaserScan)] (Lazy 0)
+[parameter_bridge-10] [INFO] [1782057132.936897184] [pose_bridge]: Creating GZ->ROS Bridge: [/model/turtlebot4/pose (gz.msgs.Pose_V) -> /model/turtlebot4/pose (tf2_msgs/msg/TFMessage)] (Lazy 0)
+[parameter_bridge-10] [INFO] [1782057132.952064407] [pose_bridge]: Creating GZ->ROS Bridge: [/model/standard_dock/pose (gz.msgs.Pose_V) -> /model/standard_dock/pose (tf2_msgs/msg/TFMessage)] (Lazy 0)
+[create-8] [INFO] [1782057133.030007751] [ros_gz_sim]: Requesting list of world names.
+[parameter_bridge-2] [INFO] [1782057133.033628429] [clock_bridge]: Creating GZ->ROS Bridge: [/clock (gz.msgs.Clock) -> /clock (rosgraph_msgs/msg/Clock)] (Lazy 0)
+[parameter_bridge-26] [INFO] [1782057133.047255107] [hmi_buttons_msg_bridge]: Creating GZ->ROS Bridge: [/hmi/buttons (gz.msgs.Int32) -> /hmi/buttons (std_msgs/msg/Int32)] (Lazy 0)
+[parameter_bridge-11] [INFO] [1782057133.071845927] [odom_base_tf_bridge]: Creating GZ->ROS Bridge: [/model/turtlebot4/tf (gz.msgs.Pose_V) -> /model/turtlebot4/tf (tf2_msgs/msg/TFMessage)] (Lazy 0)
+[parameter_bridge-9] [INFO] [1782057133.133550134] [cmd_vel_bridge]: Creating GZ->ROS Bridge: [/cmd_vel (gz.msgs.Twist) -> /cmd_vel (geometry_msgs/msg/TwistStamped)] (Lazy 0)
+[parameter_bridge-9] [INFO] [1782057133.157274790] [cmd_vel_bridge]: Creating ROS->GZ Bridge: [/model/turtlebot4/cmd_vel (geometry_msgs/msg/TwistStamped) -> /model/turtlebot4/cmd_vel (gz.msgs.Twist)] (Lazy 0)
+[parameter_bridge-21] [INFO] [1782057133.230077583] [ir_intensity_left_bridge]: Creating GZ->ROS Bridge: [/world/warehouse/model/turtlebot4/link/ir_intensity_left/sensor/ir_intensity_left/scan (gz.msgs.LaserScan) -> /world/warehouse/model/turtlebot4/link/ir_intensity_left/sensor/ir_intensity_left/scan (sensor_msgs/msg/LaserScan)] (Lazy 0)
+[parameter_bridge-27] [INFO] [1782057133.258248574] [hmi_led_msg_bridge]: Creating ROS->GZ Bridge: [/hmi/led/power (std_msgs/msg/Int32) -> /hmi/led/power (gz.msgs.Int32)] (Lazy 0)
+[robot_state-38] [INFO] [1782057133.265533233] [robot_state]: Advertised topic: battery_state
+[parameter_bridge-27] [INFO] [1782057133.272052298] [hmi_led_msg_bridge]: Creating ROS->GZ Bridge: [/hmi/led/motors (std_msgs/msg/Int32) -> /hmi/led/motors (gz.msgs.Int32)] (Lazy 0)
+[parameter_bridge-27] [INFO] [1782057133.282270962] [hmi_led_msg_bridge]: Creating ROS->GZ Bridge: [/hmi/led/comms (std_msgs/msg/Int32) -> /hmi/led/comms (gz.msgs.Int32)] (Lazy 0)
+[robot_state-38] [INFO] [1782057133.291487691] [robot_state]: Subscription to topic: dock_status
+[parameter_bridge-27] [INFO] [1782057133.307369384] [hmi_led_msg_bridge]: Creating ROS->GZ Bridge: [/hmi/led/wifi (std_msgs/msg/Int32) -> /hmi/led/wifi (gz.msgs.Int32)] (Lazy 0)
+[mock_publisher-37] [INFO] [1782057133.310070820] [mock_publisher]: Advertised mocked topic: slip_status
+[parameter_bridge-27] [INFO] [1782057133.339988246] [hmi_led_msg_bridge]: Creating ROS->GZ Bridge: [/hmi/led/battery (std_msgs/msg/Int32) -> /hmi/led/battery (gz.msgs.Int32)] (Lazy 0)
+[robot_state-38] [INFO] [1782057133.392970893] [robot_state]: Advertised topic: stop_status
+[robot_state-38] [INFO] [1782057133.438788659] [robot_state]: Subscription to topic: odom
+[parameter_bridge-27] [INFO] [1782057133.449207556] [hmi_led_msg_bridge]: Creating ROS->GZ Bridge: [/hmi/led/user1 (std_msgs/msg/Int32) -> /hmi/led/user1 (gz.msgs.Int32)] (Lazy 0)
+[parameter_bridge-27] [INFO] [1782057133.458277900] [hmi_led_msg_bridge]: Creating ROS->GZ Bridge: [/hmi/led/user2 (std_msgs/msg/Int32) -> /hmi/led/user2 (gz.msgs.Int32)] (Lazy 0)
+[parameter_bridge-29] [INFO] [1782057133.502467261] [camera_bridge]: Creating GZ->ROS Bridge: [/world/warehouse/model/turtlebot4/link/oakd_rgb_camera_frame/sensor/rgbd_camera/image (gz.msgs.Image) -> /world/warehouse/model/turtlebot4/link/oakd_rgb_camera_frame/sensor/rgbd_camera/image (sensor_msgs/msg/Image)] (Lazy 0)
+[parameter_bridge-18] [INFO] [1782057133.515393437] [ir_intensity_front_center_right_bridge]: Creating GZ->ROS Bridge: [/world/warehouse/model/turtlebot4/link/ir_intensity_front_center_right/sensor/ir_intensity_front_center_right/scan (gz.msgs.LaserScan) -> /world/warehouse/model/turtlebot4/link/ir_intensity_front_center_right/sensor/ir_intensity_front_center_right/scan (sensor_msgs/msg/LaserScan)] (Lazy 0)
+[kidnap_estimator_publisher-39] [INFO] [1782057133.521325771] [kidnap_estimator_publisher]: Advertised topic: kidnap_status
+[kidnap_estimator_publisher-39] [INFO] [1782057133.524529012] [kidnap_estimator_publisher]: Subscription to topic: hazard_detection
+[parameter_bridge-25] [INFO] [1782057133.530158168] [hmi_display_msg_bridge]: Creating ROS->GZ Bridge: [/hmi/display/raw (std_msgs/msg/String) -> /hmi/display/raw (gz.msgs.StringMsg)] (Lazy 0)
+[parameter_bridge-24] [INFO] [1782057133.541562795] [buttons_msg_bridge]: Creating GZ->ROS Bridge: [/create3_buttons (gz.msgs.Int32) -> /create3_buttons (std_msgs/msg/Int32)] (Lazy 0)
+[parameter_bridge-25] [INFO] [1782057133.543161238] [hmi_display_msg_bridge]: Creating ROS->GZ Bridge: [/hmi/display/selected (std_msgs/msg/Int32) -> /hmi/display/selected (gz.msgs.Int32)] (Lazy 0)
+[static_transform_publisher-44] [INFO] [1782057133.604903019] [rplidar_stf]: Spinning until stopped - publishing transform
+[static_transform_publisher-44] translation: ('0.000000', '0.000000', '0.000000')
+[static_transform_publisher-44] rotation: ('0.000000', '0.000000', '0.000000', '1.000000')
+[static_transform_publisher-44] from 'rplidar_link' to 'turtlebot4/rplidar_link/rplidar'
+[parameter_bridge-22] [INFO] [1782057133.620383756] [ir_intensity_right_bridge]: Creating GZ->ROS Bridge: [/world/warehouse/model/turtlebot4/link/ir_intensity_right/sensor/ir_intensity_right/scan (gz.msgs.LaserScan) -> /world/warehouse/model/turtlebot4/link/ir_intensity_right/sensor/ir_intensity_right/scan (sensor_msgs/msg/LaserScan)] (Lazy 0)
+[wheel_status_publisher-36] [INFO] [1782057133.633060880] [wheel_status_publisher]: Advertised topic: wheel_vels
+[parameter_bridge-29] [INFO] [1782057133.639976920] [camera_bridge]: Creating GZ->ROS Bridge: [/world/warehouse/model/turtlebot4/link/oakd_rgb_camera_frame/sensor/rgbd_camera/depth_image (gz.msgs.Image) -> /world/warehouse/model/turtlebot4/link/oakd_rgb_camera_frame/sensor/rgbd_camera/depth_image (sensor_msgs/msg/Image)] (Lazy 0)
+[parameter_bridge-29] [INFO] [1782057133.689136560] [camera_bridge]: Creating GZ->ROS Bridge: [/world/warehouse/model/turtlebot4/link/oakd_rgb_camera_frame/sensor/rgbd_camera/points (gz.msgs.PointCloudPacked) -> /world/warehouse/model/turtlebot4/link/oakd_rgb_camera_frame/sensor/rgbd_camera/points (sensor_msgs/msg/PointCloud2)] (Lazy 0)
+[parameter_bridge-29] [INFO] [1782057133.700864271] [camera_bridge]: Creating GZ->ROS Bridge: [/world/warehouse/model/turtlebot4/link/oakd_rgb_camera_frame/sensor/rgbd_camera/camera_info (gz.msgs.CameraInfo) -> /world/warehouse/model/turtlebot4/link/oakd_rgb_camera_frame/sensor/rgbd_camera/camera_info (sensor_msgs/msg/CameraInfo)] (Lazy 0)
+[wheel_status_publisher-36] [INFO] [1782057133.745940888] [wheel_status_publisher]: Advertised topic: wheel_ticks
+[parameter_bridge-20] [INFO] [1782057133.808337076] [ir_intensity_front_right_bridge]: Creating GZ->ROS Bridge: [/world/warehouse/model/turtlebot4/link/ir_intensity_front_right/sensor/ir_intensity_front_right/scan (gz.msgs.LaserScan) -> /world/warehouse/model/turtlebot4/link/ir_intensity_front_right/sensor/ir_intensity_front_right/scan (sensor_msgs/msg/LaserScan)] (Lazy 0)
+[hazards_vector_publisher-33] [INFO] [1782057133.881340311] [hazards_vector_publisher]: Advertised topic: hazard_detection
+[ui_mgr-40] [INFO] [1782057133.904059053] [ui_mgr]: Subscription to topic: cmd_lightring
+[spawner-32] [INFO] [1782057133.920882756] [spawner_joint_state_broadcaster]: waiting for service /controller_manager/list_controllers to become available...
+[ui_mgr-40] [INFO] [1782057133.942460860] [ui_mgr]: Subscription to topic: cmd_audio
+[parameter_bridge-19] [INFO] [1782057133.946720092] [ir_intensity_front_left_bridge]: Creating GZ->ROS Bridge: [/world/warehouse/model/turtlebot4/link/ir_intensity_front_left/sensor/ir_intensity_front_left/scan (gz.msgs.LaserScan) -> /world/warehouse/model/turtlebot4/link/ir_intensity_front_left/sensor/ir_intensity_front_left/scan (sensor_msgs/msg/LaserScan)] (Lazy 0)
+[hazards_vector_publisher-33] [INFO] [1782057133.964755390] [hazards_vector_publisher]: Subscription to topic: _internal/bumper/event
+[static_transform_publisher-45] [INFO] [1782057134.011669374] [camera_stf]: Spinning until stopped - publishing transform
+[static_transform_publisher-45] translation: ('0.000000', '0.000000', '0.000000')
+[static_transform_publisher-45] rotation: ('0.499952', '-0.500000', '0.500000', '0.500048')
+[static_transform_publisher-45] from 'oakd_rgb_camera_optical_frame' to 'turtlebot4/oakd_rgb_camera_frame/rgbd_camera'
+[hazards_vector_publisher-33] [INFO] [1782057134.049651160] [hazards_vector_publisher]: Subscription to topic: _internal/cliff_front_left/event
+[hazards_vector_publisher-33] [INFO] [1782057134.071316495] [hazards_vector_publisher]: Subscription to topic: _internal/cliff_front_right/event
+[hazards_vector_publisher-33] [INFO] [1782057134.087977818] [hazards_vector_publisher]: Subscription to topic: _internal/cliff_side_left/event
+[hazards_vector_publisher-33] [INFO] [1782057134.101634178] [hazards_vector_publisher]: Subscription to topic: _internal/cliff_side_right/event
+[parameter_bridge-23] [INFO] [1782057134.110052070] [ir_intensity_side_left_bridge]: Creating GZ->ROS Bridge: [/world/warehouse/model/turtlebot4/link/ir_intensity_side_left/sensor/ir_intensity_side_left/scan (gz.msgs.LaserScan) -> /world/warehouse/model/turtlebot4/link/ir_intensity_side_left/sensor/ir_intensity_side_left/scan (sensor_msgs/msg/LaserScan)] (Lazy 0)
+[turtlebot4_node-30] [INFO] [1782057134.105027595] [turtlebot4_node]: Init Turtlebot4 Node Main
+[hazards_vector_publisher-33] [INFO] [1782057134.142748875] [hazards_vector_publisher]: Subscription to topic: _internal/wheel_drop/left_wheel/event
+[hazards_vector_publisher-33] [INFO] [1782057134.156968499] [hazards_vector_publisher]: Subscription to topic: _internal/wheel_drop/right_wheel/event
+[hazards_vector_publisher-33] [INFO] [1782057134.163380429] [hazards_vector_publisher]: Subscription to topic: _internal/backup_limit
+[parameter_bridge-15] [INFO] [1782057134.172761284] [cliff_side_left_bridge]: Creating GZ->ROS Bridge: [/world/warehouse/model/turtlebot4/link/base_link/sensor/cliff_side_left/scan (gz.msgs.LaserScan) -> /world/warehouse/model/turtlebot4/link/base_link/sensor/cliff_side_left/scan (sensor_msgs/msg/LaserScan)] (Lazy 0)
+[joint_state_publisher-4] [INFO] [1782057134.227952712] [joint_state_publisher]: Waiting for robot_description to be published on the robot_description topic...
+[parameter_bridge-17] [INFO] [1782057134.466028145] [ir_intensity_front_center_left_bridge]: Creating GZ->ROS Bridge: [/world/warehouse/model/turtlebot4/link/ir_intensity_front_center_left/sensor/ir_intensity_front_center_left/scan (gz.msgs.LaserScan) -> /world/warehouse/model/turtlebot4/link/ir_intensity_front_center_left/sensor/ir_intensity_front_center_left/scan (sensor_msgs/msg/LaserScan)] (Lazy 0)
+[motion_control-35] [INFO] [1782057134.875448583] [motion_control]: Enabling REFLEX_BUMP
+[motion_control-35] [INFO] [1782057134.880443306] [motion_control]: Enabling REFLEX_CLIFF
+[motion_control-35] [INFO] [1782057134.910254784] [motion_control]: Enabling REFLEX_STUCK
+[motion_control-35] [INFO] [1782057134.926430505] [motion_control]: Enabling REFLEX_WHEEL_DROP
+[parameter_bridge-28] [INFO] [1782057134.932811286] [lidar_bridge]: Creating GZ->ROS Bridge: [/world/warehouse/model/turtlebot4/link/rplidar_link/sensor/rplidar/scan (gz.msgs.LaserScan) -> /world/warehouse/model/turtlebot4/link/rplidar_link/sensor/rplidar/scan (sensor_msgs/msg/LaserScan)] (Lazy 0)
+[joint_state_publisher-4] [INFO] [1782057136.828265968] [joint_state_publisher]: Got description, configuring robot
+[create-7] [INFO] [1782057136.901195591] [ros_gz_sim]: Requesting list of world names.
+[gazebo-1] [1;36m[GUI] [Dbg] [Gui.cc:355] [0m[1;36mGUI requesting list of world names. The server may be busy [0m[1;36mdownloading resources. Please be patient.[0m[1;36m[0m
+[create-8] [INFO] [1782057138.038555178] [ros_gz_sim]: Requesting list of world names.
+[joint_state_publisher-4] [INFO] [1782057138.702558994] [joint_state_publisher]: Got description, configuring robot
+[turtlebot4_node-30] [INFO] [1782057140.418866196] [turtlebot4_node]: Buttons Init
+[turtlebot4_node-30] [INFO] [1782057140.432245148] [turtlebot4_node]: Init Display
+[turtlebot4_node-30] [INFO] [1782057140.438158835] [turtlebot4_node]: Leds Init
+[turtlebot4_node-30] [INFO] [1782057140.465805462] [turtlebot4_node]: Turtlebot4 standard running.
+[parameter_bridge-27] [INFO] [1782057140.518977166] [hmi_led_msg_bridge]: Passing message from ROS std_msgs/msg/Int32 to Gazebo gz.msgs.Int32 (showing msg only once per type)
+[parameter_bridge-25] [INFO] [1782057140.521029504] [hmi_display_msg_bridge]: Passing message from ROS std_msgs/msg/Int32 to Gazebo gz.msgs.Int32 (showing msg only once per type)
+[parameter_bridge-25] [INFO] [1782057140.521132868] [hmi_display_msg_bridge]: Passing message from ROS std_msgs/msg/String to Gazebo gz.msgs.StringMsg (showing msg only once per type)
+[create-7] [INFO] [1782057141.902484281] [ros_gz_sim]: Requesting list of world names.
+[gazebo-1] [1;36m[GUI] [Dbg] [Gui.cc:355] [0m[1;36mGUI requesting list of world names. The server may be busy [0m[1;36mdownloading resources. Please be patient.[0m[1;36m[0m
+[create-8] [INFO] [1782057143.040812960] [ros_gz_sim]: Requesting list of world names.
+[create-7] [INFO] [1782057146.907137467] [ros_gz_sim]: Requesting list of world names.
+[gazebo-1] [1;36m[GUI] [Dbg] [Gui.cc:355] [0m[1;36mGUI requesting list of world names. The server may be busy [0m[1;36mdownloading resources. Please be patient.[0m[1;36m[0m
+[create-8] [INFO] [1782057148.041757381] [ros_gz_sim]: Requesting list of world names.
+[create-7] [INFO] [1782057151.907408495] [ros_gz_sim]: Requesting list of world names.
+[gazebo-1] [1;36m[GUI] [Dbg] [Gui.cc:355] [0m[1;36mGUI requesting list of world names. The server may be busy [0m[1;36mdownloading resources. Please be patient.[0m[1;36m[0m
+[create-8] [INFO] [1782057153.042055770] [ros_gz_sim]: Requesting list of world names.
+[create-7] [INFO] [1782057156.907814450] [ros_gz_sim]: Requesting list of world names.
+[gazebo-1] [1;36m[GUI] [Dbg] [Gui.cc:355] [0m[1;36mGUI requesting list of world names. The server may be busy [0m[1;36mdownloading resources. Please be patient.[0m[1;36m[0m
+[create-8] [INFO] [1782057158.042349613] [ros_gz_sim]: Requesting list of world names.
+[create-7] [INFO] [1782057161.908259930] [ros_gz_sim]: Requesting list of world names.
+[gazebo-1] [1;36m[GUI] [Dbg] [Gui.cc:355] [0m[1;36mGUI requesting list of world names. The server may be busy [0m[1;36mdownloading resources. Please be patient.[0m[1;36m[0m
+[create-8] [INFO] [1782057163.042664544] [ros_gz_sim]: Requesting list of world names.
+[spawner-32] [FATAL] [1782057163.996451005] [spawner_joint_state_broadcaster]: Could not contact service /controller_manager/list_controllers
+[ERROR] [spawner-32]: process has died [pid 19223, exit code 1, cmd '/opt/ros/jazzy/lib/controller_manager/spawner joint_state_broadcaster -c controller_manager --controller-manager-timeout 30 --ros-args -r __ns:=/'].
+[INFO] [spawner-46]: process started with pid [20132]
+[spawner-46] [INFO] [1782057164.611846385] [spawner_diffdrive_controller]: waiting for service /controller_manager/list_controllers to become available...
+[create-7] [INFO] [1782057166.909153503] [ros_gz_sim]: Requesting list of world names.
+[gazebo-1] [1;36m[GUI] [Dbg] [Gui.cc:355] [0m[1;36mGUI requesting list of world names. The server may be busy [0m[1;36mdownloading resources. Please be patient.[0m[1;36m[0m
+[create-8] [INFO] [1782057168.042962849] [ros_gz_sim]: Requesting list of world names.
+[create-7] [INFO] [1782057171.909610779] [ros_gz_sim]: Requesting list of world names.
+[gazebo-1] [1;36m[GUI] [Dbg] [Gui.cc:355] [0m[1;36mGUI requesting list of world names. The server may be busy [0m[1;36mdownloading resources. Please be patient.[0m[1;36m[0m
+[create-8] [INFO] [1782057173.043273303] [ros_gz_sim]: Requesting list of world names.
+[create-7] [INFO] [1782057176.921524918] [ros_gz_sim]: Requesting list of world names.
+[gazebo-1] [1;36m[GUI] [Dbg] [Gui.cc:355] [0m[1;36mGUI requesting list of world names. The server may be busy [0m[1;36mdownloading resources. Please be patient.[0m[1;36m[0m
+[create-8] [INFO] [1782057178.043580961] [ros_gz_sim]: Requesting list of world names.
+[create-7] [INFO] [1782057181.921808425] [ros_gz_sim]: Requesting list of world names.
+[gazebo-1] [1;36m[GUI] [Dbg] [Gui.cc:355] [0m[1;36mGUI requesting list of world names. The server may be busy [0m[1;36mdownloading resources. Please be patient.[0m[1;36m[0m
+[create-8] [INFO] [1782057183.043904121] [ros_gz_sim]: Requesting list of world names.
+[create-7] [INFO] [1782057186.922164705] [ros_gz_sim]: Requesting list of world names.
+[gazebo-1] [1;36m[GUI] [Dbg] [Gui.cc:355] [0m[1;36mGUI requesting list of world names. The server may be busy [0m[1;36mdownloading resources. Please be patient.[0m[1;36m[0m
+[create-8] [INFO] [1782057188.044203744] [ros_gz_sim]: Requesting list of world names.
+[create-7] [INFO] [1782057191.922617434] [ros_gz_sim]: Requesting list of world names.
+[gazebo-1] [1;36m[GUI] [Dbg] [Gui.cc:355] [0m[1;36mGUI requesting list of world names. The server may be busy [0m[1;36mdownloading resources. Please be patient.[0m[1;36m[0m
+[create-8] [INFO] [1782057193.044506998] [ros_gz_sim]: Requesting list of world names.
+[spawner-46] [FATAL] [1782057194.655474841] [spawner_diffdrive_controller]: Could not contact service /controller_manager/list_controllers
+[ERROR] [spawner-46]: process has died [pid 20132, exit code 1, cmd '/opt/ros/jazzy/lib/controller_manager/spawner diffdrive_controller -c controller_manager --controller-manager-timeout 30 --ros-args -r __ns:=/ --params-file /home/brookz/create3_ws/install/irobot_create_control/share/irobot_create_control/config/control.yaml'].
+[create-7] [INFO] [1782057196.923176949] [ros_gz_sim]: Requesting list of world names.
+[gazebo-1] [1;36m[GUI] [Dbg] [Gui.cc:355] [0m[1;36mGUI requesting list of world names. The server may be busy [0m[1;36mdownloading resources. Please be patient.[0m[1;36m[0m
+[create-8] [INFO] [1782057198.044855858] [ros_gz_sim]: Requesting list of world names.
+[create-7] [INFO] [1782057201.923510600] [ros_gz_sim]: Requesting list of world names.
+[create-8] [INFO] [1782057203.046139466] [ros_gz_sim]: Requesting list of world names.
+[create-7] [INFO] [1782057206.924843323] [ros_gz_sim]: Requesting list of world names.
+[gazebo-1] Escalating to SIGKILL on [Gazebo Sim Server]
+[INFO] [gazebo-1]: process has finished cleanly [pid 19172]
+[create-8] [INFO] [1782057208.046425263] [ros_gz_sim]: Requesting list of world names.
+[create-7] [INFO] [1782057211.925173136] [ros_gz_sim]: Requesting list of world names.
+[create-8] [INFO] [1782057213.046784045] [ros_gz_sim]: Requesting list of world names.
+[create-7] [INFO] [1782057216.925584247] [ros_gz_sim]: Requesting list of world names.
+[create-8] [INFO] [1782057218.047058672] [ros_gz_sim]: Requesting list of world names.
+[create-7] [INFO] [1782057221.925918117] [ros_gz_sim]: Requesting list of world names.
+[create-8] [INFO] [1782057223.047346642] [ros_gz_sim]: Requesting list of world names.
+[create-7] [INFO] [1782057226.926280975] [ros_gz_sim]: Requesting list of world names.
+[create-8] [INFO] [1782057228.047690210] [ros_gz_sim]: Requesting list of world names.
