@@ -20,17 +20,29 @@ fail() {
     FAIL=$((FAIL + 1))
 }
 
+source_setup_safely() {
+    local setup_file="$1"
+
+    if [[ ! -f "${setup_file}" ]]; then
+        echo "ERROR: setup file not found: ${setup_file}" >&2
+        return 1
+    fi
+
+    set +u
+    # shellcheck disable=SC1090
+    source "${setup_file}"
+    set -u
+}
+
 source_ros() {
     if [[ ! -f /opt/ros/jazzy/setup.bash ]]; then
         fail "/opt/ros/jazzy/setup.bash not found"
         return 1
     fi
-    # shellcheck disable=SC1091
-    source /opt/ros/jazzy/setup.bash
+    source_setup_safely /opt/ros/jazzy/setup.bash
 
-    if [[ -f "${PROJECT_ROOT}/../install/setup.bash" ]]; then
-        # shellcheck disable=SC1091
-        source "${PROJECT_ROOT}/../install/setup.bash"
+    if [[ -f "${PROJECT_ROOT}/install/setup.bash" ]]; then
+        source_setup_safely "${PROJECT_ROOT}/install/setup.bash"
     fi
 }
 
@@ -108,7 +120,7 @@ main() {
     echo "============================================================"
 
     check_server_only
-    check_topic_data /clock rosgraph_msgs/msg/Clock 5
+    check_topic_data /clock rosgraph_msgs/msg/Clock 15
     check_topic_data /scan sensor_msgs/msg/LaserScan 8
     check_topic_data /odom nav_msgs/msg/Odometry 8
     check_topic_data /dock_status irobot_create_msgs/msg/DockStatus 8

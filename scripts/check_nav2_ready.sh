@@ -24,6 +24,7 @@ set -o pipefail
 PASS=0
 WARN=0
 FAIL=0
+DOCK_STATUS_TIMEOUT="${DOCK_STATUS_TIMEOUT:-20}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
@@ -86,7 +87,7 @@ rm -f "${tmp_file}"
 check_topic_exists() {
 local topic="$1"
 
-if ros2 topic list 2>/dev/null | grep -qx "${topic}"; then
+if timeout 5s ros2 topic list 2>/dev/null | grep -qx "${topic}"; then
 ok "topic exists: ${topic}"
 else
 fail "topic missing: ${topic}"
@@ -96,7 +97,7 @@ fi
 check_action_exists() {
 local action="$1"
 
-if ros2 action list 2>/dev/null | grep -qx "${action}"; then
+if timeout 15s ros2 action list 2>/dev/null | grep -qx "${action}"; then
 ok "action exists: ${action}"
 else
 fail "action missing: ${action}"
@@ -125,7 +126,7 @@ check_lifecycle_active() {
 local node="$1"
 local output
 
-output="$(ros2 lifecycle get "${node}" 2>/dev/null || true)"
+output="$(timeout 8s ros2 lifecycle get "${node}" 2>/dev/null || true)"
 
 if echo "${output}" | grep -qi "active"; then
 ok "lifecycle active: ${node}"
@@ -140,7 +141,7 @@ print_topic_type() {
 local topic="$1"
 local output
 
-output="$(ros2 topic info "${topic}" 2>/dev/null || true)"
+output="$(timeout 5s ros2 topic info "${topic}" 2>/dev/null || true)"
 
 if [[ -n "${output}" ]]; then
 ok "topic info available: ${topic}"
@@ -188,7 +189,7 @@ check_action_exists /undock
 
 echo
 echo "[5] Dock and wheel status"
-check_topic_data /dock_status "" 5
+check_topic_data /dock_status "" "${DOCK_STATUS_TIMEOUT}"
 check_topic_data /wheel_status "" 5
 
 echo

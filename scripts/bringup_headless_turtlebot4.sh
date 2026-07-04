@@ -24,6 +24,20 @@ process_running() {
     kill -0 "$1" 2>/dev/null
 }
 
+source_setup_safely() {
+    local setup_file="$1"
+
+    if [[ ! -f "${setup_file}" ]]; then
+        echo "ERROR: setup file not found: ${setup_file}" >&2
+        return 1
+    fi
+
+    set +u
+    # shellcheck disable=SC1090
+    source "${setup_file}"
+    set -u
+}
+
 stop_process_group() {
     local pid="$1"
     local name="$2"
@@ -118,12 +132,10 @@ main() {
         log "ERROR: /opt/ros/jazzy/setup.bash not found"
         return 1
     fi
-    # shellcheck disable=SC1091
-    source /opt/ros/jazzy/setup.bash
+    source_setup_safely /opt/ros/jazzy/setup.bash
 
-    if [[ -f "${PROJECT_ROOT}/../install/setup.bash" ]]; then
-        # shellcheck disable=SC1091
-        source "${PROJECT_ROOT}/../install/setup.bash"
+    if [[ -f "${PROJECT_ROOT}/install/setup.bash" ]]; then
+        source_setup_safely "${PROJECT_ROOT}/install/setup.bash"
     fi
 
     if [[ ! -f "${WORLD_FILE}" ]]; then

@@ -2,11 +2,13 @@
 
 from .executor import DryRunExecutor, Nav2WaypointExecutor
 from .llm_provider import (
+    GeminiPlannerProvider,
     MockPlannerProvider,
     PlannerProvider,
     PlannerProviderError,
     RealLLMPlannerProvider,
     VerifiedPlannerAdapter,
+    provider_from_env,
 )
 from .nav2_client import (
     Nav2ActionClient,
@@ -15,10 +17,12 @@ from .nav2_client import (
     WaypointStore,
 )
 from .planner import MockPlanner
+from .sim_execution_request import build_sim_nav2_execution_request
 from .verifier import PlanVerificationError, PlanVerifier
 
 __all__ = [
     "DryRunExecutor",
+    "GeminiPlannerProvider",
     "MockPlannerProvider",
     "MockPlanner",
     "Nav2ActionClient",
@@ -31,6 +35,8 @@ __all__ = [
     "VerifiedPlannerAdapter",
 
     "PlanVerifier",
+    "build_sim_nav2_execution_request",
+    "provider_from_env",
     "WaypointConfigError",
     "WaypointStore",
 ]

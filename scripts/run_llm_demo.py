@@ -18,6 +18,7 @@ from house_sitter_core.llm_provider import (  # noqa: E402
     PlannerProvider,
     PlannerProviderError,
     VerifiedPlannerAdapter,
+    provider_from_env,
 )
 from house_sitter_core.reporting import build_task_report  # noqa: E402
 from house_sitter_core.verifier import PlanVerificationError, PlanVerifier  # noqa: E402
@@ -51,7 +52,7 @@ def run_demo(
     """Run the full demo pipeline without touching ROS or any external API."""
 
     output = stream or sys.stdout
-    provider = provider or MockPlannerProvider()
+    provider = provider or provider_from_env(stream=output)
     verifier = verifier or build_verifier()
     executor = executor or DryRunExecutor()
 

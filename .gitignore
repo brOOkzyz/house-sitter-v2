@@ -11,3 +11,11 @@ docs/session_handoff.md
 __pycache__/
 *.pyc
 *.pyo
+.pytest_cache/
+
+# Local environment files
+.env
+*.env
+
+# Run artifacts
+logs/
