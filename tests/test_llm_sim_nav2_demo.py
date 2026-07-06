@@ -52,16 +52,11 @@ class LLMSimNav2DemoTests(unittest.TestCase):
             )
         output = stream.getvalue()
         self.assertEqual(exit_code, 0)
-        self.assertIn(
-            "Planner source 'mock_planner' only produced the structured intent",
-            output,
-        )
-        self.assertNotIn(
-            "Gemini only produced the structured intent: navigate_to_waypoint hallway.",
-            output,
-        )
+        self.assertIn("structured intent source: mock_planner", output)
+        self.assertIn("Planner source 'mock_planner' produced the structured intent.", output)
+        self.assertNotIn("Gemini SDK produced the structured intent.", output)
 
-    def test_gemini_planner_hallway_summary_can_claim_gemini(self):
+    def test_gemini_planner_hallway_summary_can_claim_gemini_sdk(self):
         plan = make_plan(
             "visit_hallway",
             "gemini_planner",
@@ -76,8 +71,10 @@ class LLMSimNav2DemoTests(unittest.TestCase):
             )
         output = stream.getvalue()
         self.assertEqual(exit_code, 0)
+        self.assertIn("structured intent source: gemini_planner", output)
+        self.assertIn("Gemini SDK produced the structured intent.", output)
         self.assertIn(
-            "Gemini only produced the structured intent: navigate_to_waypoint hallway.",
+            "hallway is resolved from a user-labelled semantic waypoint/area registry.",
             output,
         )
 

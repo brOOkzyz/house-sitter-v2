@@ -2,16 +2,19 @@
 
 import io
 import json
+from unittest import mock
 import unittest
 from pathlib import Path
 
 from house_sitter_core.llm_provider import (
+    GEMINI_PLAN_JSON_SCHEMA,
     GeminiPlannerProvider,
     MockPlannerProvider,
     PlannerProvider,
     PlannerProviderError,
     RealLLMPlannerProvider,
     VerifiedPlannerAdapter,
+    build_structured_planner_prompt,
     provider_from_env,
 )
 from house_sitter_core.schemas import make_plan
@@ -30,6 +33,26 @@ class StaticProvider(PlannerProvider):
         return self.output
 
 
+class FakeResponse:
+    def __init__(self, parsed=None):
+        self.parsed = parsed
+
+
+class FakeModels:
+    def __init__(self, response):
+        self.response = response
+        self.calls = []
+
+    def generate_content(self, *, model, contents, config):
+        self.calls.append({"model": model, "contents": contents, "config": config})
+        return self.response
+
+
+class FakeClient:
+    def __init__(self, response):
+        self.models = FakeModels(response)
+
+
 class LLMProviderTests(unittest.TestCase):
     def setUp(self):
         self.verifier = PlanVerifier(
@@ -46,7 +69,6 @@ class LLMProviderTests(unittest.TestCase):
         self.assertEqual(plan["source"], "mock_planner")
         self.assertEqual(plan["steps"][0]["action"], "navigate_to_waypoint")
 
-
     def test_gemini_missing_api_key_falls_back_to_mock(self):
         stream = io.StringIO()
         provider = provider_from_env({"LLM_PROVIDER": "gemini"}, stream=stream)
@@ -61,27 +83,88 @@ class LLMProviderTests(unittest.TestCase):
         self.assertEqual(plan["source"], "mock_planner")
         self.assertEqual(plan["steps"][0]["parameters"]["waypoint"], "hallway")
 
-    def test_gemini_malformed_json_is_rejected_before_verifier(self):
-        provider = GeminiPlannerProvider(
-            api_key="test-key",
-            transport=lambda prompt, api_key, model: "not json",
+    def test_gemini_provider_requires_sdk_when_no_transport_or_client(self):
+        with self.assertRaisesRegex(
+            PlannerProviderError,
+            "google-genai package is required for Gemini SDK provider",
+        ):
+            with mock.patch(
+                "house_sitter_core.llm_provider._load_google_genai_sdk",
+                side_effect=PlannerProviderError(
+                    "google-genai package is required for Gemini SDK provider"
+                ),
+            ):
+                GeminiPlannerProvider(api_key="test-key")
+
+    def test_gemini_provider_uses_sdk_structured_output_schema(self):
+        response = FakeResponse(
+            {
+                "schema_version": "1.0",
+                "task_name": "visit_hallway",
+                "source": "gemini_planner",
+                "steps": [
+                    {
+                        "action": "navigate_to_waypoint",
+                        "parameters": {"waypoint": "hallway"},
+                    }
+                ],
+            }
         )
-        adapter = VerifiedPlannerAdapter(provider, self.verifier)
-        with self.assertRaises(PlannerProviderError):
-            adapter.generate("visit the hallway")
+        client = FakeClient(response)
+        provider = GeminiPlannerProvider(api_key="test-key", client=client)
+        raw = provider.generate_json("visit the hallway")
+        plan = json.loads(raw)
+        self.assertEqual(plan["source"], "gemini_planner")
+        self.assertEqual(plan["steps"][0]["parameters"]["waypoint"], "hallway")
+        self.assertEqual(client.models.calls[0]["config"]["response_mime_type"], "application/json")
+        self.assertEqual(client.models.calls[0]["config"]["response_json_schema"], GEMINI_PLAN_JSON_SCHEMA)
+
+    def test_gemini_provider_rejects_coordinate_like_fields(self):
+        response = FakeResponse(
+            {
+                "schema_version": "1.0",
+                "task_name": "visit_hallway",
+                "source": "gemini_planner",
+                "steps": [
+                    {
+                        "action": "navigate_to_waypoint",
+                        "parameters": {"waypoint": "hallway", "x": 1.0},
+                    }
+                ],
+            }
+        )
+        provider = GeminiPlannerProvider(api_key="test-key", client=FakeClient(response))
+        with self.assertRaisesRegex(PlannerProviderError, "coordinate-like field"):
+            provider.generate_json("visit the hallway")
+
+    def test_gemini_provider_rejects_missing_parsed_output(self):
+        provider = GeminiPlannerProvider(api_key="test-key", client=FakeClient(FakeResponse(None)))
+        with self.assertRaisesRegex(
+            PlannerProviderError,
+            "Gemini SDK response did not contain parsed structured output",
+        ):
+            provider.generate_json("visit the hallway")
+
+    def test_gemini_provider_prompt_rejects_coordinates_and_cmd_vel(self):
+        prompt = build_structured_planner_prompt("move somewhere")
+        self.assertIn("Do not output x, y, yaw, pose, coordinates, cmd_vel", prompt)
+        self.assertIn("user-labelled semantic waypoint/area registry", prompt)
 
     def test_valid_gemini_json_creates_simulation_execution_request(self):
-        raw_plan = json.dumps(
-            make_plan(
-                "visit_hallway",
-                "gemini_planner",
-                [{"action": "navigate_to_waypoint", "parameters": {"waypoint": "hallway"}}],
-            )
+        response = FakeResponse(
+            {
+                "schema_version": "1.0",
+                "task_name": "visit_hallway",
+                "source": "gemini_planner",
+                "steps": [
+                    {
+                        "action": "navigate_to_waypoint",
+                        "parameters": {"waypoint": "hallway"},
+                    }
+                ],
+            }
         )
-        provider = GeminiPlannerProvider(
-            api_key="test-key",
-            transport=lambda prompt, api_key, model: raw_plan,
-        )
+        provider = GeminiPlannerProvider(api_key="test-key", client=FakeClient(response))
         verified = VerifiedPlannerAdapter(provider, self.verifier).generate("visit hallway")
         request = build_sim_nav2_execution_request(verified)
         self.assertTrue(request["requires_navigation"])
@@ -89,19 +172,23 @@ class LLMProviderTests(unittest.TestCase):
         self.assertFalse(request["uses_llm_coordinates"])
         self.assertFalse(request["uses_direct_cmd_vel"])
 
-    def test_gemini_prompt_rejects_coordinates_and_cmd_vel(self):
-        seen = {}
-
-        def transport(prompt, api_key, model):
-            seen["prompt"] = prompt
-            return json.dumps(make_plan("status", "gemini_planner", [
-                {"action": "report_status", "parameters": {"detail": "brief"}}
-            ]))
-
-        provider = GeminiPlannerProvider(api_key="test-key", transport=transport)
-        provider.generate_json("move somewhere")
-        self.assertIn("Do not output coordinates", seen["prompt"])
-        self.assertIn("Do not output cmd_vel", seen["prompt"])
+    def test_verifier_remains_mandatory_for_unknown_semantic_label(self):
+        response = FakeResponse(
+            {
+                "schema_version": "1.0",
+                "task_name": "visit_garage",
+                "source": "gemini_planner",
+                "steps": [
+                    {
+                        "action": "navigate_to_waypoint",
+                        "parameters": {"waypoint": "garage"},
+                    }
+                ],
+            }
+        )
+        provider = GeminiPlannerProvider(api_key="test-key", client=FakeClient(response))
+        with self.assertRaises(PlanVerificationError):
+            VerifiedPlannerAdapter(provider, self.verifier).generate("visit the garage")
 
     def test_real_provider_is_disabled_by_default(self):
         calls = []

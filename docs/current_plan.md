@@ -19,12 +19,12 @@ Physical robot deployment is outside the project scope.
 
 ## Semantic Grounding
 
-Room and area names are grounded through user-labelled semantic waypoints and areas in `config/semantic_waypoints.json`. Gemini does not infer physical room locations from the map. The current hallway demo uses a labelled semantic intent that is resolved through the registry and then mapped to a simulation-safe Nav2 goal by the safety layer. Physical robot deployment is outside scope.
+Room and area names are grounded through user-labelled semantic waypoints and areas in `config/semantic_waypoints.json`. Gemini does not infer physical room locations from the map. The Gemini provider now uses Python SDK structured output for plan generation, but the structured output is still passed through `PlanVerifier` before any execution request is built. The current hallway demo uses a labelled semantic intent that is resolved through the registry and then mapped to a simulation-safe Nav2 goal by the safety layer. Physical robot deployment is outside scope.
 
 ## Completed Modules
 
 - JSON-only LLM planning
-- Gemini provider with mock fallback
+- Gemini Python SDK structured output provider with mock fallback
 - Plan verifier
 - Dry-run executor
 - Task report
@@ -41,6 +41,7 @@ Room and area names are grounded through user-labelled semantic waypoints and ar
 ## Safety Design
 
 - LLM output is never executed directly.
+- Gemini SDK structured output is not trusted directly.
 - LLM output must pass the verifier.
 - LLM cannot choose arbitrary coordinates.
 - Room and area labels must already exist in `config/semantic_waypoints.json`.
@@ -62,7 +63,7 @@ Nav2 readiness: PASS
 simulation-only undock: PASS
 simulation-only micro Nav2 navigation: PASS
 LLM-to-simulation Nav2 demo: PASS
-pytest: 34 passed
+pytest: 39 passed
 ```
 
 ## Run Commands
