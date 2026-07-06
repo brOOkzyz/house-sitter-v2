@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any, Dict
 
 from .schemas import SCHEMA_VERSION, TaskPlan
+from .semantic_waypoints import SemanticWaypointError, SemanticWaypointRegistry
 
 
 class PlanVerificationError(ValueError):
@@ -13,9 +14,21 @@ class PlanVerificationError(ValueError):
 
 
 class PlanVerifier:
-    def __init__(self, allowed_actions_path: Path, waypoints_path: Path) -> None:
+    def __init__(
+        self,
+        allowed_actions_path: Path,
+        waypoints_path: Path,
+        semantic_waypoints_path: Path | None = None,
+    ) -> None:
         self.rules = self._load_json(allowed_actions_path)
         self.waypoint_config = self._load_json(waypoints_path)
+        try:
+            self.semantic_waypoints = SemanticWaypointRegistry(
+                semantic_waypoints_path
+                or allowed_actions_path.parent / "semantic_waypoints.json"
+            )
+        except SemanticWaypointError as exc:
+            raise PlanVerificationError(str(exc)) from exc
 
     @staticmethod
     def _load_json(path: Path) -> Dict[str, Any]:
@@ -95,6 +108,13 @@ class PlanVerifier:
                 raise PlanVerificationError(
                     f"Step {index} references unknown waypoint: {value}"
                 )
+        if rules.get("source") == "semantic_waypoints":
+            try:
+                self.semantic_waypoints.resolve(value)
+            except SemanticWaypointError as exc:
+                raise PlanVerificationError(
+                    f"Step {index} references unknown semantic waypoint: {value}"
+                ) from exc
         if "allowed_values" in rules and value not in rules["allowed_values"]:
             raise PlanVerificationError(f"Step {index} parameter {name} is not allowed.")
         if "minimum" in rules and value < rules["minimum"]:

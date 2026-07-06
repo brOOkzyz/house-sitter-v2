@@ -87,7 +87,7 @@ class LLMDemoTests(unittest.TestCase):
         output = stream.getvalue()
         self.assertEqual(exit_code, 1)
         self.assertIn("Rejected request", output)
-        self.assertIn("unknown waypoint", output)
+        self.assertIn("unknown semantic waypoint", output)
 
     def test_cmd_vel_like_request_is_rejected(self):
         plan = make_plan(
@@ -105,6 +105,45 @@ class LLMDemoTests(unittest.TestCase):
         self.assertEqual(exit_code, 1)
         self.assertIn("Rejected request", output)
         self.assertIn("disallowed action", output)
+
+    def test_mock_planner_hallway_summary_does_not_claim_gemini(self):
+        stream = io.StringIO()
+        exit_code = run_demo(
+            "visit the hallway",
+            provider=MockPlannerProvider(),
+            executor=RecordingExecutor(),
+            stream=stream,
+        )
+        output = stream.getvalue()
+        self.assertEqual(exit_code, 0)
+        self.assertIn(
+            "Planner source 'mock_planner' only produced the structured intent",
+            output,
+        )
+        self.assertNotIn(
+            "Gemini only produced the structured intent: navigate_to_waypoint hallway.",
+            output,
+        )
+
+    def test_gemini_planner_hallway_summary_can_claim_gemini(self):
+        plan = make_plan(
+            "visit_hallway",
+            "gemini_planner",
+            [{"action": "navigate_to_waypoint", "parameters": {"waypoint": "hallway"}}],
+        )
+        stream = io.StringIO()
+        exit_code = run_demo(
+            "visit the hallway",
+            provider=StaticProvider(json.dumps(plan)),
+            executor=RecordingExecutor(),
+            stream=stream,
+        )
+        output = stream.getvalue()
+        self.assertEqual(exit_code, 0)
+        self.assertIn(
+            "Gemini only produced the structured intent: navigate_to_waypoint hallway.",
+            output,
+        )
 
 
 if __name__ == "__main__":

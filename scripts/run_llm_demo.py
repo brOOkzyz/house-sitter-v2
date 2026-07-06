@@ -21,6 +21,7 @@ from house_sitter_core.llm_provider import (  # noqa: E402
     provider_from_env,
 )
 from house_sitter_core.reporting import build_task_report  # noqa: E402
+from house_sitter_core.semantic_waypoints import resolve_semantic_label  # noqa: E402
 from house_sitter_core.verifier import PlanVerificationError, PlanVerifier  # noqa: E402
 
 
@@ -39,6 +40,40 @@ def build_verifier() -> PlanVerifier:
         PROJECT_ROOT / "config" / "allowed_actions.json",
         PROJECT_ROOT / "config" / "waypoints.json",
     )
+
+
+def _semantic_labels(verified_plan: dict) -> list[str]:
+    return [
+        step["parameters"]["waypoint"]
+        for step in verified_plan["steps"]
+        if step["action"] == "navigate_to_waypoint"
+    ]
+
+
+def _structured_intent_source_text(verified_plan: dict) -> str:
+    source = verified_plan["source"]
+    if source == "gemini_planner":
+        return "Gemini"
+    return f"Planner source '{source}'"
+
+
+def _print_semantic_grounding_summary(verified_plan: dict, output: TextIO) -> None:
+    labels = _semantic_labels(verified_plan)
+    if "hallway" not in labels:
+        return
+    resolved = resolve_semantic_label("hallway")
+    intent_source = _structured_intent_source_text(verified_plan)
+    print("\n=== Semantic grounding summary ===", file=output)
+    print("hallway is a user-labelled semantic area.", file=output)
+    print(
+        f"{intent_source} only produced the structured intent: "
+        "navigate_to_waypoint hallway.",
+        file=output,
+    )
+    print("semantic grounding was resolved by the registry.", file=output)
+    print("Nav2 goal was selected by the simulation safety layer.", file=output)
+    print("Gemini did not provide coordinates.", file=output)
+    print(f"grounding_mode: {resolved['grounding_mode']}", file=output)
 
 
 def run_demo(
@@ -69,6 +104,8 @@ def run_demo(
         print("\n=== Verification result ===", file=output)
         print("passed", file=output)
         print(json.dumps(verified_plan, indent=2), file=output)
+
+        _print_semantic_grounding_summary(verified_plan, output)
 
         print("\n=== Dry-run execution steps ===", file=output)
         records = executor.execute(verified_plan)

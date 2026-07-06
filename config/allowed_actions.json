@@ -8,7 +8,7 @@
       "description": "Navigate to a named waypoint. Phase 1 only validates and prints this action.",
       "required_parameters": ["waypoint"],
       "parameters": {
-        "waypoint": {"type": "string", "source": "waypoints"}
+        "waypoint": {"type": "string", "source": "semantic_waypoints"}
       }
     },
     "rotate": {

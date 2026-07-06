@@ -19,6 +19,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from house_sitter_core.llm_provider import (  # noqa: E402
+    PlannerProvider,
     PlannerProviderError,
     VerifiedPlannerAdapter,
     provider_from_env,
@@ -26,6 +27,7 @@ from house_sitter_core.llm_provider import (  # noqa: E402
 from house_sitter_core.sim_execution_request import (  # noqa: E402
     build_sim_nav2_execution_request,
 )
+from house_sitter_core.semantic_waypoints import resolve_semantic_label  # noqa: E402
 from house_sitter_core.verifier import PlanVerificationError, PlanVerifier  # noqa: E402
 
 
@@ -36,17 +38,60 @@ def build_verifier() -> PlanVerifier:
     )
 
 
-def run_demo(command: str, *, execute_sim: bool = False) -> int:
+def _semantic_labels(verified_plan: dict) -> list[str]:
+    return [
+        step["parameters"]["waypoint"]
+        for step in verified_plan["steps"]
+        if step["action"] == "navigate_to_waypoint"
+    ]
+
+
+def _structured_intent_source_text(verified_plan: dict) -> str:
+    source = verified_plan["source"]
+    if source == "gemini_planner":
+        return "Gemini"
+    return f"Planner source '{source}'"
+
+
+def _print_semantic_grounding_summary(verified_plan: dict) -> None:
+    labels = _semantic_labels(verified_plan)
+    if "hallway" not in labels:
+        return
+    resolved = resolve_semantic_label("hallway")
+    intent_source = _structured_intent_source_text(verified_plan)
+    print("\n=== Semantic grounding summary ===")
+    print("hallway is a user-labelled semantic area.")
+    print(
+        f"{intent_source} only produced the structured intent: "
+        "navigate_to_waypoint hallway."
+    )
+    print("semantic grounding was resolved by the registry.")
+    print("Nav2 goal was selected by the simulation safety layer.")
+    print("Gemini did not provide coordinates.")
+    print(f"grounding_mode: {resolved['grounding_mode']}")
+
+
+def run_demo(
+    command: str,
+    *,
+    execute_sim: bool = False,
+    provider: Optional[PlannerProvider] = None,
+    verifier: Optional[PlanVerifier] = None,
+) -> int:
     print("=== Simulation-only LLM Nav2 demo ===")
     print("No direct /cmd_vel is published.")
     print("LLM output must pass the JSON verifier.")
     print("Navigation maps to the micro-smoke safety layer, not LLM coordinates.")
 
     try:
-        provider = provider_from_env(stream=sys.stdout)
-        adapter = VerifiedPlannerAdapter(provider, build_verifier())
+        provider = provider or provider_from_env(stream=sys.stdout)
+        verifier = verifier or build_verifier()
+        adapter = VerifiedPlannerAdapter(provider, verifier)
         verified_plan = adapter.generate(command)
-        request = build_sim_nav2_execution_request(verified_plan)
+        request = build_sim_nav2_execution_request(
+            verified_plan,
+            semantic_resolver=verifier.semantic_waypoints.resolve,
+        )
     except (PlannerProviderError, PlanVerificationError, ValueError) as exc:
         print("\n=== Rejected request ===")
         print(f"Error: {exc}")
@@ -54,6 +99,7 @@ def run_demo(command: str, *, execute_sim: bool = False) -> int:
 
     print("\n=== Verified JSON plan ===")
     print(json.dumps(verified_plan, indent=2))
+    _print_semantic_grounding_summary(verified_plan)
     print("\n=== Simulation execution request ===")
     print(json.dumps(request, indent=2))
 

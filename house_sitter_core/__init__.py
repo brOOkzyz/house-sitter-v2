@@ -17,6 +17,12 @@ from .nav2_client import (
     WaypointStore,
 )
 from .planner import MockPlanner
+from .semantic_waypoints import (
+    SemanticWaypointError,
+    SemanticWaypointRegistry,
+    resolve_semantic_label,
+    semantic_label_exists,
+)
 from .sim_execution_request import build_sim_nav2_execution_request
 from .verifier import PlanVerificationError, PlanVerifier
 
@@ -33,6 +39,10 @@ __all__ = [
     "PlannerProviderError",
     "RealLLMPlannerProvider",
     "VerifiedPlannerAdapter",
+    "SemanticWaypointError",
+    "SemanticWaypointRegistry",
+    "resolve_semantic_label",
+    "semantic_label_exists",
 
     "PlanVerifier",
     "build_sim_nav2_execution_request",

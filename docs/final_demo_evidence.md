@@ -5,6 +5,10 @@ Final Demo Evidence
 
 This project is simulation-only. Physical robot deployment is outside the project scope.
 
+## Semantic Grounding
+
+Room and area names are grounded through user-labelled semantic waypoints and areas in `config/semantic_waypoints.json`. Gemini does not infer physical room locations from the map. The current hallway demo uses a labelled semantic intent that is resolved through the registry and then mapped to a simulation-safe Nav2 goal by the safety layer. Physical robot deployment is outside scope.
+
 ## Latest Successful Gemini Dry-Run Result
 
 - Command: `python3 scripts/run_llm_demo.py "visit the hallway"`
@@ -30,7 +34,7 @@ This project is simulation-only. Physical robot deployment is outside the projec
 ## Latest Pytest Result
 
 - Command: `python3 -m pytest`
-- Result: `30 passed`
+- Result: `34 passed`
 
 ## Relevant Log Files
 

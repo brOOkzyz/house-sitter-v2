@@ -1,0 +1,54 @@
+{
+  "schema_version": "1.0",
+  "simulation_only": true,
+  "labels": {
+    "hallway": {
+      "label": "hallway",
+      "description": "User-labelled semantic area for the current hallway visit demo.",
+      "simulation_only": true,
+      "validated": true,
+      "grounding_mode": "simulation_safe_nearby_goal",
+      "execution_target": {
+        "type": "simulation_safe_nearby_goal",
+        "script": "scripts/run_sim_nav2_micro_smoke.py"
+      },
+      "explanation": "The label is user-provided, and the current demo maps it to a safe nearby Nav2 goal selected by the simulation safety layer."
+    },
+    "living_room": {
+      "label": "living_room",
+      "description": "User-labelled semantic area retained for mock planning and verifier tests.",
+      "simulation_only": true,
+      "validated": true,
+      "grounding_mode": "simulation_safe_nearby_goal",
+      "execution_target": {
+        "type": "simulation_safe_nearby_goal",
+        "script": "scripts/run_sim_nav2_micro_smoke.py"
+      },
+      "explanation": "The label is user-provided; simulation execution resolves it through the registry before the safety layer selects any Nav2 goal."
+    },
+    "start": {
+      "label": "start",
+      "description": "User-labelled semantic start area used by mock return-to-start plans.",
+      "simulation_only": true,
+      "validated": true,
+      "grounding_mode": "simulation_safe_nearby_goal",
+      "execution_target": {
+        "type": "simulation_safe_nearby_goal",
+        "script": "scripts/run_sim_nav2_micro_smoke.py"
+      },
+      "explanation": "The label is user-provided; no LLM-provided coordinates are accepted."
+    },
+    "nearby_test": {
+      "label": "nearby_test",
+      "description": "User-labelled simulation safety test waypoint retained for ROS-independent safety tests.",
+      "simulation_only": true,
+      "validated": true,
+      "grounding_mode": "simulation_safe_nearby_goal",
+      "execution_target": {
+        "type": "simulation_safe_nearby_goal",
+        "script": "scripts/run_sim_nav2_micro_smoke.py"
+      },
+      "explanation": "The label is preconfigured and remains simulation-only in this project scope."
+    }
+  }
+}
