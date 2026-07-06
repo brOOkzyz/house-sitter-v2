@@ -19,3 +19,4 @@ __pycache__/
 
 # Run artifacts
 logs/
+.venv/
