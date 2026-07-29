@@ -42,20 +42,26 @@ def build_verifier() -> PlanVerifier:
     )
 
 
-def _semantic_labels(verified_plan: dict) -> list[str]:
+def _semantic_labels(plan: dict) -> list[str]:
     return [
         step["parameters"]["waypoint"]
-        for step in verified_plan["steps"]
+        for step in plan["steps"]
         if step["action"] == "navigate_to_waypoint"
     ]
 
 
-def _print_semantic_grounding_summary(verified_plan: dict, output: TextIO) -> None:
-    labels = _semantic_labels(verified_plan)
-    if not labels:
+def _print_semantic_grounding_summary(
+    raw_plan: dict,
+    verified_plan: dict,
+    output: TextIO,
+) -> None:
+    raw_labels = _semantic_labels(raw_plan)
+    verified_labels = _semantic_labels(verified_plan)
+    if not raw_labels or not verified_labels:
         return
-    label = labels[0]
-    resolved = resolve_semantic_label(label)
+    original_label = raw_labels[0]
+    canonical_label = verified_labels[0]
+    resolved = resolve_semantic_label(original_label)
     source = verified_plan["source"]
     print("\n=== Semantic grounding summary ===", file=output)
     print(f"structured intent source: {source}", file=output)
@@ -63,11 +69,17 @@ def _print_semantic_grounding_summary(verified_plan: dict, output: TextIO) -> No
         print("Gemini SDK produced the structured intent.", file=output)
     else:
         print(f"Planner source '{source}' produced the structured intent.", file=output)
+    print(f"original semantic expression: {resolved['original_input']}", file=output)
+    print(f"matched alias: {resolved['matched_alias']}", file=output)
+    print(f"canonical semantic label: {resolved['canonical_label']}", file=output)
     print(
-        f"{label} is resolved from a user-labelled semantic waypoint/area registry.",
+        f"{original_label} is resolved from a user-labelled semantic waypoint/area registry.",
         file=output,
     )
-    print("semantic labels remain simulation-only metadata.", file=output)
+    print(
+        f"semantic labels remain simulation-only metadata; canonical label is {canonical_label}.",
+        file=output,
+    )
     print("semantic grounding was resolved by the registry.", file=output)
     print("Nav2 goal was selected by the simulation safety layer.", file=output)
     print("Gemini did not provide coordinates.", file=output)
@@ -96,6 +108,7 @@ def run_demo(
         raw_json = provider.generate_json(command)
         print("\n=== Generated JSON plan ===", file=output)
         print(raw_json, file=output)
+        raw_plan = json.loads(raw_json)
 
         adapter = VerifiedPlannerAdapter(_StaticJsonProvider(raw_json), verifier)
         verified_plan = adapter.generate(command)
@@ -103,13 +116,16 @@ def run_demo(
         print("passed", file=output)
         print(json.dumps(verified_plan, indent=2), file=output)
 
-        _print_semantic_grounding_summary(verified_plan, output)
+        _print_semantic_grounding_summary(raw_plan, verified_plan, output)
 
         print("\n=== Dry-run execution steps ===", file=output)
         records = executor.execute(verified_plan)
 
         print("\n=== Final task report ===", file=output)
-        print(json.dumps(build_task_report(verified_plan["task_name"], records), indent=2), file=output)
+        print(
+            json.dumps(build_task_report(verified_plan["task_name"], records), indent=2),
+            file=output,
+        )
         print("\nNo ROS 2 commands were sent.", file=output)
         return 0
     except (PlannerProviderError, PlanVerificationError, ValueError) as exc:

@@ -106,39 +106,65 @@ class LLMDemoTests(unittest.TestCase):
         self.assertIn("Rejected request", output)
         self.assertIn("disallowed action", output)
 
-    def test_mock_planner_hallway_summary_does_not_claim_gemini(self):
+    def test_mock_planner_corridor_summary_shows_canonical_hallway(self):
         stream = io.StringIO()
         exit_code = run_demo(
-            "visit the hallway",
+            "go through the corridor",
             provider=MockPlannerProvider(),
             executor=RecordingExecutor(),
             stream=stream,
         )
         output = stream.getvalue()
         self.assertEqual(exit_code, 0)
-        self.assertIn("structured intent source: mock_planner", output)
-        self.assertIn("Planner source 'mock_planner' produced the structured intent.", output)
-        self.assertIn("hallway is resolved from a user-labelled semantic waypoint/area registry.", output)
-        self.assertNotIn("Gemini SDK produced the structured intent.", output)
+        self.assertIn("original semantic expression: corridor", output)
+        self.assertIn("matched alias: corridor", output)
+        self.assertIn("canonical semantic label: hallway", output)
+        self.assertIn('"waypoint": "hallway"', output)
 
-    def test_mock_planner_kitchen_summary_uses_registry(self):
+    def test_mock_planner_lounge_summary_shows_canonical_living_room(self):
         stream = io.StringIO()
         exit_code = run_demo(
-            "visit the kitchen",
+            "visit the lounge",
             provider=MockPlannerProvider(),
             executor=RecordingExecutor(),
             stream=stream,
         )
         output = stream.getvalue()
         self.assertEqual(exit_code, 0)
-        self.assertIn("kitchen is resolved from a user-labelled semantic waypoint/area registry.", output)
-        self.assertIn("semantic labels remain simulation-only metadata.", output)
-        self.assertIn('"waypoint": "kitchen"', output)
+        self.assertIn("original semantic expression: lounge", output)
+        self.assertIn("canonical semantic label: living_room", output)
+        self.assertIn('"waypoint": "living_room"', output)
 
-    def test_mock_planner_garage_is_rejected_by_verifier(self):
+    def test_mock_planner_front_door_summary_shows_canonical_entrance(self):
         stream = io.StringIO()
         exit_code = run_demo(
-            "visit the garage",
+            "go to the front door",
+            provider=MockPlannerProvider(),
+            executor=RecordingExecutor(),
+            stream=stream,
+        )
+        output = stream.getvalue()
+        self.assertEqual(exit_code, 0)
+        self.assertIn("original semantic expression: front door", output)
+        self.assertIn("canonical semantic label: entrance", output)
+
+    def test_mock_planner_charging_station_summary_shows_canonical_charging_area(self):
+        stream = io.StringIO()
+        exit_code = run_demo(
+            "return to the charging station",
+            provider=MockPlannerProvider(),
+            executor=RecordingExecutor(),
+            stream=stream,
+        )
+        output = stream.getvalue()
+        self.assertEqual(exit_code, 0)
+        self.assertIn("original semantic expression: charging station", output)
+        self.assertIn("canonical semantic label: charging_area", output)
+
+    def test_mock_planner_balcony_is_rejected_by_verifier(self):
+        stream = io.StringIO()
+        exit_code = run_demo(
+            "visit the balcony",
             provider=MockPlannerProvider(),
             executor=RecordingExecutor(),
             stream=stream,

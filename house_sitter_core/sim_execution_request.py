@@ -34,6 +34,9 @@ def build_sim_nav2_execution_request(
         navigation_intents.append(
             {
                 "semantic_label": label,
+                "original_input": resolved["original_input"],
+                "matched_alias": resolved["matched_alias"],
+                "canonical_label": resolved["canonical_label"],
                 "description": resolved["description"],
                 "grounding_mode": resolved["grounding_mode"],
                 "execution_target": resolved["execution_target"],

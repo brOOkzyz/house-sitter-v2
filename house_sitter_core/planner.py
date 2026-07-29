@@ -3,6 +3,7 @@
 import re
 
 from .schemas import ActionStep, TaskPlan, make_plan
+from .semantic_waypoints import load_semantic_waypoint_registry
 
 
 class MockPlanner:
@@ -50,22 +51,21 @@ class MockPlanner:
 
     @staticmethod
     def _detect_destination(prompt: str) -> str:
-        label_aliases = {
-            "living_room": ("living room", "living_room"),
-            "hallway": ("hallway", "corridor"),
-            "kitchen": ("kitchen",),
-            "bedroom": ("bedroom",),
-            "entrance": ("entrance", "entryway", "entry"),
-            "charging_area": ("charging area", "charging_area", "charger area"),
-            "garage": ("garage",),
-        }
-        for label, aliases in label_aliases.items():
-            if any(alias in prompt for alias in aliases):
-                return label
+        registry = load_semantic_waypoint_registry()
+        matched_expression = registry.match_prompt_expression(prompt)
+        if matched_expression is not None:
+            return matched_expression
+        if "garage" in prompt:
+            return "garage"
+        if "balcony" in prompt:
+            return "balcony"
+        if "office" in prompt:
+            return "office"
         return "start"
 
     @staticmethod
     def _task_name(is_patrol: bool, destination: str, should_return: bool) -> str:
         prefix = "patrol" if is_patrol else "visit"
         suffix = "_and_return" if should_return else ""
-        return f"{prefix}_{destination}{suffix}"
+        normalized_destination = re.sub(r"[\s-]+", "_", destination)
+        return f"{prefix}_{normalized_destination}{suffix}"

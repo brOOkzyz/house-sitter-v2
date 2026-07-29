@@ -287,6 +287,7 @@ def build_structured_planner_prompt(user_prompt: str) -> str:
         "For navigate_to_waypoint, waypoint must be a user-labelled semantic registry string such as "
         "\"start\", \"hallway\", \"living_room\", \"kitchen\", \"bedroom\", \"entrance\", \"charging_area\", or \"nearby_test\".\n"
         "Do not output x, y, yaw, pose, coordinates, cmd_vel, ROS topics, or ROS commands.\n"
+        "Gemini does not define aliases or coordinates; aliases are explicitly user-configured in the local semantic waypoint registry.\n"
         "Gemini only outputs structured intent; semantic labels are resolved later through a user-labelled semantic waypoint/area registry.\n"
         f"User request: {user_prompt}"
     )

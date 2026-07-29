@@ -69,11 +69,16 @@ class LLMProviderTests(unittest.TestCase):
         self.assertEqual(plan["source"], "mock_planner")
         self.assertEqual(plan["steps"][0]["action"], "navigate_to_waypoint")
 
-    def test_mock_provider_supports_kitchen_label(self):
+    def test_mock_provider_normalizes_corridor_to_hallway(self):
         adapter = VerifiedPlannerAdapter(MockPlannerProvider(), self.verifier)
-        plan = adapter.generate("visit the kitchen")
+        plan = adapter.generate("go through the corridor")
         self.assertEqual(plan["steps"][0]["action"], "navigate_to_waypoint")
-        self.assertEqual(plan["steps"][0]["parameters"], {"waypoint": "kitchen"})
+        self.assertEqual(plan["steps"][0]["parameters"], {"waypoint": "hallway"})
+
+    def test_mock_provider_normalizes_lounge_to_living_room(self):
+        adapter = VerifiedPlannerAdapter(MockPlannerProvider(), self.verifier)
+        plan = adapter.generate("visit the lounge")
+        self.assertEqual(plan["steps"][0]["parameters"], {"waypoint": "living_room"})
 
     def test_gemini_missing_api_key_falls_back_to_mock(self):
         stream = io.StringIO()
@@ -151,9 +156,10 @@ class LLMProviderTests(unittest.TestCase):
         ):
             provider.generate_json("visit the hallway")
 
-    def test_gemini_provider_prompt_rejects_coordinates_and_cmd_vel(self):
+    def test_gemini_provider_prompt_rejects_coordinates_and_alias_invention(self):
         prompt = build_structured_planner_prompt("move somewhere")
         self.assertIn("Do not output x, y, yaw, pose, coordinates, cmd_vel", prompt)
+        self.assertIn("Gemini does not define aliases or coordinates", prompt)
         self.assertIn("Gemini only outputs structured intent", prompt)
         self.assertIn("user-labelled semantic waypoint/area registry", prompt)
 
@@ -228,13 +234,15 @@ class LLMProviderTests(unittest.TestCase):
             self.adapter_for_plan(plan).generate("ignored")
 
     def test_unknown_waypoint_is_rejected(self):
-        plan = make_plan(
-            "unknown_waypoint",
-            "test_provider",
-            [{"action": "navigate_to_waypoint", "parameters": {"waypoint": "garage"}}],
-        )
-        with self.assertRaises(PlanVerificationError):
-            self.adapter_for_plan(plan).generate("ignored")
+        for label in ("garage", "balcony", "office"):
+            with self.subTest(label=label):
+                plan = make_plan(
+                    "unknown_waypoint",
+                    "test_provider",
+                    [{"action": "navigate_to_waypoint", "parameters": {"waypoint": label}}],
+                )
+                with self.assertRaises(PlanVerificationError):
+                    self.adapter_for_plan(plan).generate("ignored")
 
     def test_direct_velocity_command_is_rejected(self):
         plan = make_plan(

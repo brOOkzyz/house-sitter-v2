@@ -59,10 +59,11 @@ class PlanVerifier:
         if not isinstance(steps, list) or not 1 <= len(steps) <= max_steps:
             raise PlanVerificationError(f"steps must contain between 1 and {max_steps} items.")
 
-        for index, step in enumerate(steps):
+        verified_plan = copy.deepcopy(plan)
+        for index, step in enumerate(verified_plan["steps"]):
             self._verify_step(index, step)
 
-        return copy.deepcopy(plan)  # type: ignore[return-value]
+        return verified_plan  # type: ignore[return-value]
 
     def _verify_step(self, index: int, step: Any) -> None:
         if not isinstance(step, dict) or set(step) != {"action", "parameters"}:
@@ -88,12 +89,12 @@ class PlanVerifier:
             extras = sorted(set(parameters) - set(parameter_rules))
             raise PlanVerificationError(f"Step {index} has unknown parameters: {extras}")
 
-        for name, value in parameters.items():
-            self._verify_parameter(index, name, value, parameter_rules[name])
+        for name, value in list(parameters.items()):
+            parameters[name] = self._verify_parameter(index, name, value, parameter_rules[name])
 
     def _verify_parameter(
         self, index: int, name: str, value: Any, rules: Dict[str, Any]
-    ) -> None:
+    ) -> Any:
         expected_type = rules["type"]
         if expected_type == "string" and not isinstance(value, str):
             raise PlanVerificationError(f"Step {index} parameter {name} must be a string.")
@@ -110,15 +111,16 @@ class PlanVerifier:
                 )
         if rules.get("source") == "semantic_waypoints":
             try:
-                self.semantic_waypoints.resolve(value)
+                resolved = self.semantic_waypoints.resolve(value)
             except SemanticWaypointError as exc:
                 raise PlanVerificationError(
                     f"Step {index} references unknown semantic waypoint: {value}"
                 ) from exc
+            value = resolved["canonical_label"]
         if "allowed_values" in rules and value not in rules["allowed_values"]:
             raise PlanVerificationError(f"Step {index} parameter {name} is not allowed.")
         if "minimum" in rules and value < rules["minimum"]:
             raise PlanVerificationError(f"Step {index} parameter {name} is below minimum.")
         if "maximum" in rules and value > rules["maximum"]:
             raise PlanVerificationError(f"Step {index} parameter {name} exceeds maximum.")
-
+        return value

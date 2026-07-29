@@ -4,6 +4,11 @@
   "labels": {
     "hallway": {
       "label": "hallway",
+      "aliases": [
+        "corridor",
+        "passage",
+        "passageway"
+      ],
       "description": "User-labelled semantic area for the current hallway visit demo.",
       "simulation_only": true,
       "validated": true,
@@ -12,10 +17,15 @@
         "type": "simulation_safe_nearby_goal",
         "script": "scripts/run_sim_nav2_micro_smoke.py"
       },
-      "explanation": "The label is user-provided, and the current demo maps it to a safe nearby Nav2 goal selected by the simulation safety layer."
+      "explanation": "The label is user-provided, simulation-only, and resolved through the local registry rather than LLM coordinates."
     },
     "living_room": {
       "label": "living_room",
+      "aliases": [
+        "living room",
+        "lounge",
+        "sitting room"
+      ],
       "description": "User-labelled semantic area retained for mock planning and verifier tests.",
       "simulation_only": true,
       "validated": true,
@@ -24,10 +34,11 @@
         "type": "simulation_safe_nearby_goal",
         "script": "scripts/run_sim_nav2_micro_smoke.py"
       },
-      "explanation": "The label is user-provided; simulation execution resolves it through the registry before the safety layer selects any Nav2 goal."
+      "explanation": "The label is user-provided, simulation-only, and aliases are explicitly configured in the local registry."
     },
     "start": {
       "label": "start",
+      "aliases": [],
       "description": "User-labelled semantic start area used by mock return-to-start plans.",
       "simulation_only": true,
       "validated": true,
@@ -40,6 +51,7 @@
     },
     "nearby_test": {
       "label": "nearby_test",
+      "aliases": [],
       "description": "User-labelled simulation safety test waypoint retained for ROS-independent safety tests.",
       "simulation_only": true,
       "validated": true,
@@ -52,6 +64,9 @@
     },
     "kitchen": {
       "label": "kitchen",
+      "aliases": [
+        "cooking area"
+      ],
       "description": "User-labelled simulation-only semantic area for dry-run and verifier coverage.",
       "simulation_only": true,
       "validated": true,
@@ -64,6 +79,9 @@
     },
     "bedroom": {
       "label": "bedroom",
+      "aliases": [
+        "sleeping room"
+      ],
       "description": "User-labelled simulation-only semantic area retained as registry metadata only.",
       "simulation_only": true,
       "validated": true,
@@ -76,6 +94,11 @@
     },
     "entrance": {
       "label": "entrance",
+      "aliases": [
+        "front door",
+        "main entrance",
+        "entryway"
+      ],
       "description": "User-labelled simulation-only semantic area for entrance-region intent testing.",
       "simulation_only": true,
       "validated": true,
@@ -88,6 +111,12 @@
     },
     "charging_area": {
       "label": "charging_area",
+      "aliases": [
+        "charging area",
+        "charging station",
+        "charger",
+        "dock area"
+      ],
       "description": "User-labelled simulation-only semantic area for charger-adjacent intent testing.",
       "simulation_only": true,
       "validated": true,

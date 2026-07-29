@@ -21,7 +21,7 @@ Physical robot deployment is outside the project scope.
 
 ## Semantic Grounding
 
-Room and area names are grounded through user-labelled semantic waypoints and areas in `config/semantic_waypoints.json`. Current simulation-only labels include `hallway`, `living_room`, `kitchen`, `bedroom`, `entrance`, `charging_area`, `start`, and `nearby_test`. Gemini does not infer physical room locations from the map and does not know physical coordinates directly. Gemini only outputs structured intent, and the structured output is still passed through `PlanVerifier` before any execution request is built. The system resolves labels through the registry, unknown labels are rejected, and any simulation goal is selected later by the safety layer. Physical robot deployment is outside scope.
+Room and area names are grounded through user-labelled semantic waypoints and areas in `config/semantic_waypoints.json`. Current simulation-only canonical labels include `hallway`, `living_room`, `kitchen`, `bedroom`, `entrance`, `charging_area`, `start`, and `nearby_test`. Aliases are explicitly user-configured in the local registry and resolve to canonical semantic labels. Gemini does not infer physical room locations from the map, does not know physical coordinates directly, and does not define aliases. Gemini only outputs structured intent, and the structured output is still passed through `PlanVerifier` before any execution request is built. Unknown expressions remain rejected, and any simulation goal is selected later by the safety layer. Physical robot deployment is outside scope.
 
 ## Completed Modules
 

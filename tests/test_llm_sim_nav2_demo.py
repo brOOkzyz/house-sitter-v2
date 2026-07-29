@@ -54,7 +54,56 @@ class LLMSimNav2DemoTests(unittest.TestCase):
         self.assertEqual(exit_code, 0)
         self.assertIn("structured intent source: mock_planner", output)
         self.assertIn("Planner source 'mock_planner' produced the structured intent.", output)
+        self.assertIn("original semantic input: hallway", output)
+        self.assertIn("matched alias: none (canonical input)", output)
+        self.assertIn("canonical semantic label: hallway", output)
+        self.assertIn("request canonical label: hallway", output)
+        self.assertIn("canonical semantic label: hallway", output)
         self.assertNotIn("Gemini SDK produced the structured intent.", output)
+
+    def test_front_door_summary_shows_alias_and_canonical_entrance(self):
+        plan = make_plan(
+            "visit_front_door",
+            "mock_planner",
+            [{"action": "navigate_to_waypoint", "parameters": {"waypoint": "front door"}}],
+        )
+        stream = io.StringIO()
+        with contextlib.redirect_stdout(stream):
+            exit_code = self.demo.run_demo(
+                "go to the front door",
+                execute_sim=False,
+                provider=StaticProvider(json.dumps(plan)),
+            )
+        output = stream.getvalue()
+        self.assertEqual(exit_code, 0)
+        self.assertIn("original semantic input: front door", output)
+        self.assertIn("matched alias: front door", output)
+        self.assertIn("canonical semantic label: entrance", output)
+        self.assertIn('"semantic_label": "entrance"', output)
+        self.assertIn('"canonical_label": "entrance"', output)
+        self.assertIn("simulation-only: yes", output)
+        self.assertIn("navigation execution started: no", output)
+        self.assertIn("direct /cmd_vel used: no", output)
+
+    def test_lounge_summary_shows_alias_and_canonical_living_room(self):
+        plan = make_plan(
+            "visit_lounge",
+            "mock_planner",
+            [{"action": "navigate_to_waypoint", "parameters": {"waypoint": "lounge"}}],
+        )
+        stream = io.StringIO()
+        with contextlib.redirect_stdout(stream):
+            exit_code = self.demo.run_demo(
+                "visit the lounge",
+                execute_sim=False,
+                provider=StaticProvider(json.dumps(plan)),
+            )
+        output = stream.getvalue()
+        self.assertEqual(exit_code, 0)
+        self.assertIn("original semantic input: lounge", output)
+        self.assertIn("matched alias: lounge", output)
+        self.assertIn("canonical semantic label: living_room", output)
+        self.assertIn('"semantic_label": "living_room"', output)
 
     def test_gemini_planner_hallway_summary_can_claim_gemini_sdk(self):
         plan = make_plan(
@@ -73,10 +122,26 @@ class LLMSimNav2DemoTests(unittest.TestCase):
         self.assertEqual(exit_code, 0)
         self.assertIn("structured intent source: gemini_planner", output)
         self.assertIn("Gemini SDK produced the structured intent.", output)
-        self.assertIn(
-            "hallway is resolved from a user-labelled semantic waypoint/area registry.",
-            output,
+        self.assertIn("canonical semantic label: hallway", output)
+
+    def test_balcony_is_rejected_before_simulation_request(self):
+        plan = make_plan(
+            "visit_balcony",
+            "mock_planner",
+            [{"action": "navigate_to_waypoint", "parameters": {"waypoint": "balcony"}}],
         )
+        stream = io.StringIO()
+        with contextlib.redirect_stdout(stream):
+            exit_code = self.demo.run_demo(
+                "visit the balcony",
+                execute_sim=False,
+                provider=StaticProvider(json.dumps(plan)),
+            )
+        output = stream.getvalue()
+        self.assertEqual(exit_code, 1)
+        self.assertIn("Rejected request", output)
+        self.assertIn("unknown semantic waypoint", output)
+        self.assertNotIn("=== Simulation execution request ===", output)
 
 
 if __name__ == "__main__":
