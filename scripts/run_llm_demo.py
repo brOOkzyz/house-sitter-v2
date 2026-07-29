@@ -52,9 +52,10 @@ def _semantic_labels(verified_plan: dict) -> list[str]:
 
 def _print_semantic_grounding_summary(verified_plan: dict, output: TextIO) -> None:
     labels = _semantic_labels(verified_plan)
-    if "hallway" not in labels:
+    if not labels:
         return
-    resolved = resolve_semantic_label("hallway")
+    label = labels[0]
+    resolved = resolve_semantic_label(label)
     source = verified_plan["source"]
     print("\n=== Semantic grounding summary ===", file=output)
     print(f"structured intent source: {source}", file=output)
@@ -63,9 +64,10 @@ def _print_semantic_grounding_summary(verified_plan: dict, output: TextIO) -> No
     else:
         print(f"Planner source '{source}' produced the structured intent.", file=output)
     print(
-        "hallway is resolved from a user-labelled semantic waypoint/area registry.",
+        f"{label} is resolved from a user-labelled semantic waypoint/area registry.",
         file=output,
     )
+    print("semantic labels remain simulation-only metadata.", file=output)
     print("semantic grounding was resolved by the registry.", file=output)
     print("Nav2 goal was selected by the simulation safety layer.", file=output)
     print("Gemini did not provide coordinates.", file=output)

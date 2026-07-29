@@ -50,10 +50,18 @@ class MockPlanner:
 
     @staticmethod
     def _detect_destination(prompt: str) -> str:
-        if "living room" in prompt or "living_room" in prompt:
-            return "living_room"
-        if "hallway" in prompt or "corridor" in prompt:
-            return "hallway"
+        label_aliases = {
+            "living_room": ("living room", "living_room"),
+            "hallway": ("hallway", "corridor"),
+            "kitchen": ("kitchen",),
+            "bedroom": ("bedroom",),
+            "entrance": ("entrance", "entryway", "entry"),
+            "charging_area": ("charging area", "charging_area", "charger area"),
+            "garage": ("garage",),
+        }
+        for label, aliases in label_aliases.items():
+            if any(alias in prompt for alias in aliases):
+                return label
         return "start"
 
     @staticmethod
@@ -61,4 +69,3 @@ class MockPlanner:
         prefix = "patrol" if is_patrol else "visit"
         suffix = "_and_return" if should_return else ""
         return f"{prefix}_{destination}{suffix}"
-

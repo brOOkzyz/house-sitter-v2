@@ -69,6 +69,12 @@ class LLMProviderTests(unittest.TestCase):
         self.assertEqual(plan["source"], "mock_planner")
         self.assertEqual(plan["steps"][0]["action"], "navigate_to_waypoint")
 
+    def test_mock_provider_supports_kitchen_label(self):
+        adapter = VerifiedPlannerAdapter(MockPlannerProvider(), self.verifier)
+        plan = adapter.generate("visit the kitchen")
+        self.assertEqual(plan["steps"][0]["action"], "navigate_to_waypoint")
+        self.assertEqual(plan["steps"][0]["parameters"], {"waypoint": "kitchen"})
+
     def test_gemini_missing_api_key_falls_back_to_mock(self):
         stream = io.StringIO()
         provider = provider_from_env({"LLM_PROVIDER": "gemini"}, stream=stream)
@@ -148,6 +154,7 @@ class LLMProviderTests(unittest.TestCase):
     def test_gemini_provider_prompt_rejects_coordinates_and_cmd_vel(self):
         prompt = build_structured_planner_prompt("move somewhere")
         self.assertIn("Do not output x, y, yaw, pose, coordinates, cmd_vel", prompt)
+        self.assertIn("Gemini only outputs structured intent", prompt)
         self.assertIn("user-labelled semantic waypoint/area registry", prompt)
 
     def test_valid_gemini_json_creates_simulation_execution_request(self):
@@ -189,6 +196,15 @@ class LLMProviderTests(unittest.TestCase):
         provider = GeminiPlannerProvider(api_key="test-key", client=FakeClient(response))
         with self.assertRaises(PlanVerificationError):
             VerifiedPlannerAdapter(provider, self.verifier).generate("visit the garage")
+
+    def test_verifier_rejects_direct_coordinate_target_even_when_navigation_action_is_used(self):
+        plan = make_plan(
+            "visit_hallway",
+            "gemini_planner",
+            [{"action": "navigate_to_waypoint", "parameters": {"waypoint": "hallway", "x": 1.0}}],
+        )
+        with self.assertRaises(PlanVerificationError):
+            self.adapter_for_plan(plan).generate("visit the hallway")
 
     def test_real_provider_is_disabled_by_default(self):
         calls = []

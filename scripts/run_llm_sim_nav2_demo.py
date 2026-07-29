@@ -48,9 +48,10 @@ def _semantic_labels(verified_plan: dict) -> list[str]:
 
 def _print_semantic_grounding_summary(verified_plan: dict) -> None:
     labels = _semantic_labels(verified_plan)
-    if "hallway" not in labels:
+    if not labels:
         return
-    resolved = resolve_semantic_label("hallway")
+    label = labels[0]
+    resolved = resolve_semantic_label(label)
     source = verified_plan["source"]
     print("\n=== Semantic grounding summary ===")
     print(f"structured intent source: {source}")
@@ -58,7 +59,8 @@ def _print_semantic_grounding_summary(verified_plan: dict) -> None:
         print("Gemini SDK produced the structured intent.")
     else:
         print(f"Planner source '{source}' produced the structured intent.")
-    print("hallway is resolved from a user-labelled semantic waypoint/area registry.")
+    print(f"{label} is resolved from a user-labelled semantic waypoint/area registry.")
+    print("semantic labels remain simulation-only metadata.")
     print("semantic grounding was resolved by the registry.")
     print("Nav2 goal was selected by the simulation safety layer.")
     print("Gemini did not provide coordinates.")

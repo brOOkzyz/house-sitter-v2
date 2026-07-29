@@ -285,9 +285,9 @@ def build_structured_planner_prompt(user_prompt: str) -> str:
         f"schema_version must be {SCHEMA_VERSION!r}. source must be \"gemini_planner\".\n"
         "Use only these actions: navigate_to_waypoint, rotate, wait, report_status.\n"
         "For navigate_to_waypoint, waypoint must be a user-labelled semantic registry string such as "
-        "\"start\", \"hallway\", \"living_room\", or \"nearby_test\".\n"
+        "\"start\", \"hallway\", \"living_room\", \"kitchen\", \"bedroom\", \"entrance\", \"charging_area\", or \"nearby_test\".\n"
         "Do not output x, y, yaw, pose, coordinates, cmd_vel, ROS topics, or ROS commands.\n"
-        "The hallway label is resolved later through a user-labelled semantic waypoint/area registry.\n"
+        "Gemini only outputs structured intent; semantic labels are resolved later through a user-labelled semantic waypoint/area registry.\n"
         f"User request: {user_prompt}"
     )
 

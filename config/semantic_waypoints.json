@@ -49,6 +49,54 @@
         "script": "scripts/run_sim_nav2_micro_smoke.py"
       },
       "explanation": "The label is preconfigured and remains simulation-only in this project scope."
+    },
+    "kitchen": {
+      "label": "kitchen",
+      "description": "User-labelled simulation-only semantic area for dry-run and verifier coverage.",
+      "simulation_only": true,
+      "validated": true,
+      "grounding_mode": "simulation_safe_nearby_goal",
+      "execution_target": {
+        "type": "simulation_safe_nearby_goal",
+        "script": "scripts/run_sim_nav2_micro_smoke.py"
+      },
+      "explanation": "The label is user-provided and simulation-only; the registry records semantic intent only and does not store physical coordinates."
+    },
+    "bedroom": {
+      "label": "bedroom",
+      "description": "User-labelled simulation-only semantic area retained as registry metadata only.",
+      "simulation_only": true,
+      "validated": true,
+      "grounding_mode": "simulation_safe_nearby_goal",
+      "execution_target": {
+        "type": "simulation_safe_nearby_goal",
+        "script": "scripts/run_sim_nav2_micro_smoke.py"
+      },
+      "explanation": "The label is user-provided and simulation-only; any execution target is chosen later by the simulation safety layer instead of LLM coordinates."
+    },
+    "entrance": {
+      "label": "entrance",
+      "description": "User-labelled simulation-only semantic area for entrance-region intent testing.",
+      "simulation_only": true,
+      "validated": true,
+      "grounding_mode": "simulation_safe_nearby_goal",
+      "execution_target": {
+        "type": "simulation_safe_nearby_goal",
+        "script": "scripts/run_sim_nav2_micro_smoke.py"
+      },
+      "explanation": "The label is user-provided and simulation-only; it is resolved through the registry without claiming a real entrance pose."
+    },
+    "charging_area": {
+      "label": "charging_area",
+      "description": "User-labelled simulation-only semantic area for charger-adjacent intent testing.",
+      "simulation_only": true,
+      "validated": true,
+      "grounding_mode": "simulation_safe_nearby_goal",
+      "execution_target": {
+        "type": "simulation_safe_nearby_goal",
+        "script": "scripts/run_sim_nav2_micro_smoke.py"
+      },
+      "explanation": "The label is user-provided and simulation-only; the current project does not treat it as a real dock coordinate."
     }
   }
 }

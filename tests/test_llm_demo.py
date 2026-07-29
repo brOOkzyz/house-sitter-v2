@@ -118,7 +118,35 @@ class LLMDemoTests(unittest.TestCase):
         self.assertEqual(exit_code, 0)
         self.assertIn("structured intent source: mock_planner", output)
         self.assertIn("Planner source 'mock_planner' produced the structured intent.", output)
+        self.assertIn("hallway is resolved from a user-labelled semantic waypoint/area registry.", output)
         self.assertNotIn("Gemini SDK produced the structured intent.", output)
+
+    def test_mock_planner_kitchen_summary_uses_registry(self):
+        stream = io.StringIO()
+        exit_code = run_demo(
+            "visit the kitchen",
+            provider=MockPlannerProvider(),
+            executor=RecordingExecutor(),
+            stream=stream,
+        )
+        output = stream.getvalue()
+        self.assertEqual(exit_code, 0)
+        self.assertIn("kitchen is resolved from a user-labelled semantic waypoint/area registry.", output)
+        self.assertIn("semantic labels remain simulation-only metadata.", output)
+        self.assertIn('"waypoint": "kitchen"', output)
+
+    def test_mock_planner_garage_is_rejected_by_verifier(self):
+        stream = io.StringIO()
+        exit_code = run_demo(
+            "visit the garage",
+            provider=MockPlannerProvider(),
+            executor=RecordingExecutor(),
+            stream=stream,
+        )
+        output = stream.getvalue()
+        self.assertEqual(exit_code, 1)
+        self.assertIn("Rejected request", output)
+        self.assertIn("unknown semantic waypoint", output)
 
     def test_gemini_planner_hallway_summary_can_claim_gemini_sdk(self):
         plan = make_plan(

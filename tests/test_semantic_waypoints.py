@@ -16,6 +16,14 @@ from house_sitter_core.verifier import PlanVerificationError, PlanVerifier
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
+EXPECTED_USER_LABELS = (
+    "hallway",
+    "living_room",
+    "kitchen",
+    "bedroom",
+    "entrance",
+    "charging_area",
+)
 
 
 class SemanticWaypointTests(unittest.TestCase):
@@ -27,15 +35,54 @@ class SemanticWaypointTests(unittest.TestCase):
             self.registry_path,
         )
 
-    def test_known_hallway_label_is_accepted(self):
-        self.assertTrue(semantic_label_exists("hallway", self.registry_path))
-        plan = make_plan(
-            "visit_hallway",
-            "gemini_planner",
-            [{"action": "navigate_to_waypoint", "parameters": {"waypoint": "hallway"}}],
-        )
-        verified = self.verifier.verify(plan)
-        self.assertEqual(verified["steps"][0]["parameters"]["waypoint"], "hallway")
+    def test_expected_user_label_set_is_present(self):
+        registry = json.loads(self.registry_path.read_text(encoding="utf-8"))
+        labels = registry["labels"]
+        for label in EXPECTED_USER_LABELS:
+            with self.subTest(label=label):
+                self.assertIn(label, labels)
+
+    def test_expected_user_labels_are_accepted(self):
+        for label in EXPECTED_USER_LABELS:
+            with self.subTest(label=label):
+                self.assertTrue(semantic_label_exists(label, self.registry_path))
+                plan = make_plan(
+                    f"visit_{label}",
+                    "gemini_planner",
+                    [{"action": "navigate_to_waypoint", "parameters": {"waypoint": label}}],
+                )
+                verified = self.verifier.verify(plan)
+                self.assertEqual(verified["steps"][0]["parameters"]["waypoint"], label)
+
+    def test_expected_user_labels_have_consistent_registry_metadata(self):
+        registry = json.loads(self.registry_path.read_text(encoding="utf-8"))
+        expected_keys = {
+            "label",
+            "description",
+            "simulation_only",
+            "validated",
+            "grounding_mode",
+            "execution_target",
+            "explanation",
+        }
+        for label in EXPECTED_USER_LABELS:
+            with self.subTest(label=label):
+                entry = registry["labels"][label]
+                self.assertEqual(set(entry), expected_keys)
+                self.assertEqual(entry["label"], label)
+                self.assertTrue(entry["simulation_only"])
+                self.assertTrue(entry["validated"])
+                self.assertEqual(entry["grounding_mode"], "simulation_safe_nearby_goal")
+                self.assertEqual(
+                    entry["execution_target"],
+                    {
+                        "type": "simulation_safe_nearby_goal",
+                        "script": "scripts/run_sim_nav2_micro_smoke.py",
+                    },
+                )
+                self.assertNotIn("x", entry)
+                self.assertNotIn("y", entry)
+                self.assertNotIn("yaw", entry)
 
     def test_unknown_label_is_rejected(self):
         self.assertFalse(semantic_label_exists("garage", self.registry_path))
