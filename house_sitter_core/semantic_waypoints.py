@@ -54,6 +54,26 @@ class SemanticWaypointRegistry:
         self.config = self._load_json(path)
         self.labels, self.alias_lookup, self.areas = self._validate_config(self.config)
 
+    @classmethod
+    def from_config(cls, config: Dict[str, Any]) -> "SemanticWaypointRegistry":
+        """Validate an in-memory registry draft through the same production rules."""
+        if not isinstance(config, dict):
+            raise SemanticWaypointError("Semantic waypoint registry must be an object.")
+        registry = cls.__new__(cls)
+        registry.path = None
+        registry.config = copy.deepcopy(config)
+        registry.labels, registry.alias_lookup, registry.areas = registry._validate_config(
+            registry.config
+        )
+        return registry
+
+    @classmethod
+    def validate_polygon_geometry(
+        cls, label: str, frame_id: Any, geometry: Any
+    ) -> PolygonGeometry:
+        """Validate candidate geometry through the registry's sole polygon implementation."""
+        return cls._validate_polygon(label, frame_id, geometry)
+
     @staticmethod
     def _load_json(path: Path) -> Dict[str, Any]:
         try:

@@ -29,6 +29,24 @@ Before request construction, `PlanVerifier` performs schema and allowlist checks
 
 The current production registry deliberately has no room polygons because no user-confirmed room annotations have been supplied. `tests/fixtures/semantic_areas_test.json` contains fictional coordinates solely for unit tests and is never loaded by default. A later phase may select a safe reachable target from validated polygons; this phase does not select goals or execute Nav2.
 
+### Offline annotation prototype
+
+`scripts/annotate_semantic_areas.py --map maps/minimal_slam_map.yaml` is a local Tkinter workflow for choosing an existing canonical label and clicking polygon boundary vertices on a read-only ROS map image. Backspace removes the most recent vertex, Escape clears the unsaved polygon, Enter validates it, and Export Draft writes only `local_annotations/semantic_areas_draft.json`. `local_annotations/` is Git-ignored and the tool refuses to overwrite the production registry.
+
+The `--inspect-map` mode prints YAML/image paths, PGM dimensions, resolution, origin, bounds, negate, and occupancy thresholds without starting the GUI or writing a file. The user must provide `map_id` manually; map fingerprinting is explicitly not implemented. Annotation polygons remain local validated data and are not used for safe-goal selection, Nav2 poses, ROS, Gazebo, or navigation execution.
+
+### Automatic candidate proposals
+
+`scripts/auto_propose_semantic_areas.py` provides a separate, non-GUI offline review workflow. It classifies occupied/free/unknown cells using the ROS YAML thresholds and `negate`, never promotes unknown cells to free space, erodes connections narrower than `--doorway-width-m`, regrows components, extracts/simplifies contours, and validates each resulting polygon through the semantic-area validator. `--minimum-area-m2` filters noise and `--simplify-tolerance-m` controls Ramer–Douglas–Peucker contour simplification.
+
+The command writes `local_annotations/auto_area_proposals.png` and `local_annotations/auto_area_proposals.json`, or prints no files with `--dry-run`. Proposal names are intentionally conservative: occupancy geometry alone cannot reliably identify kitchen, bedroom, or living room. Without repository-backed location evidence candidates are `unassigned`; only an elongated region may receive a low-confidence hallway suggestion, never a confirmed label. Outputs require human review, are Git-ignored, never modify production configuration, and do not generate a Nav2 goal or execute navigation.
+
+`legacy` remains the default proposal mode. `--proposal-mode hole-aware-cells` is an explicit opt-in for review-only observed free-space cells: it partitions clearance-safe free space around obstacle holes, then requires the existing simple-polygon validator and final raster safety check. These cells are not rooms, remain `canonical_label: null` / `suggested_label: unassigned` / `status: proposed`, and cannot create a production registry draft.
+
+Hole-aware output separates all safe candidates from the selected review batch. `safe_candidates.json` preserves every validator- and raster-safety-passed cell, while `auto_area_proposals.json` is only the batch selected for human inspection. `--maximum-proposal-count 0` selects all safe candidates; otherwise it limits review density only. `largest-first` is the compatible default and prioritizes larger safe candidates, so it will commonly achieve greater area coverage within a fixed batch. `spatial-balanced` is a deterministic opt-in for geographical representation: it does not maximize area coverage and does not guarantee greater coverage than `largest-first`. Neither strategy changes candidate geometry, polygon validation, or raster safety; they affect only the human-review batch and its order. Both preview files are Git-ignored local artifacts and do not establish semantic labels.
+
+The TurtleBot 4 warehouse map is retained only for technical validation of occupancy geometry and the offline review pipeline. It must not be interpreted as a residential semantic map or used as evidence for kitchen, bedroom, `living_room`, or other household labels. Its generated zones remain unassigned review artifacts, not rooms, and are never written to the production semantic registry.
+
 ## Completed Modules
 
 - JSON-only LLM planning with atomic one-to-five-step semantic navigation

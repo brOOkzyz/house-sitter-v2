@@ -20,3 +20,6 @@ __pycache__/
 # Run artifacts
 logs/
 .venv/
+
+# User-owned offline semantic-area annotation drafts
+local_annotations/

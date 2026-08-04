@@ -1,0 +1,7 @@
+{
+  "test_fixture": true,
+  "description": "Fictional synthetic occupancy values for automatic-area proposal unit tests only; not a user map or room layout.",
+  "free_pixel": 254,
+  "occupied_pixel": 0,
+  "unknown_pixel": 205
+}

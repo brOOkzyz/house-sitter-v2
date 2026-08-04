@@ -17,6 +17,18 @@ from .nav2_client import (
     WaypointStore,
 )
 from .planner import MockPlanner
+from .automatic_area_proposal import (
+    AutoAreaProposal,
+    AutomaticAreaProposalError,
+    HoleAwareReviewBatch,
+    OccupancyClassification,
+    build_hole_aware_review_batch,
+    classify_occupancy,
+    propose_semantic_areas,
+)
+from .map_coordinates import map_to_pixel, pixel_to_map
+from .map_metadata import MapMetadataError, PgmImage, RosMapMetadata, load_pgm, load_ros_map
+from .semantic_annotation import SemanticAnnotationError, SemanticAnnotationSession
 from .semantic_waypoints import (
     PolygonGeometry,
     SemanticArea,
@@ -37,6 +49,22 @@ __all__ = [
     "GeminiPlannerProvider",
     "MockPlannerProvider",
     "MockPlanner",
+    "AutoAreaProposal",
+    "AutomaticAreaProposalError",
+    "HoleAwareReviewBatch",
+    "OccupancyClassification",
+    "build_hole_aware_review_batch",
+    "classify_occupancy",
+    "propose_semantic_areas",
+    "MapMetadataError",
+    "PgmImage",
+    "RosMapMetadata",
+    "load_pgm",
+    "load_ros_map",
+    "pixel_to_map",
+    "map_to_pixel",
+    "SemanticAnnotationError",
+    "SemanticAnnotationSession",
     "Nav2ActionClient",
     "NavigateToPoseSpec",
     "Nav2WaypointExecutor",
