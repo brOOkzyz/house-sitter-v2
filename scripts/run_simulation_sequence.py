@@ -28,6 +28,10 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--semantic-regions", required=True, type=Path)
     parser.add_argument("--safe-goals", required=True, type=Path)
     parser.add_argument("--sequence", default=",".join(DEFAULT_SEQUENCE))
+    parser.add_argument("--fail-label")
+    parser.add_argument("--cancel-before-label")
+    parser.add_argument("--timeout-seconds", type=float)
+    parser.add_argument("--step-duration", action="append", default=[])
     parser.add_argument("--output-dir", required=True, type=Path)
     return parser.parse_args(argv)
 
@@ -41,8 +45,23 @@ def main(argv: list[str] | None = None) -> int:
         except ValueError as exc:
             raise SimulationSequenceError(f"Sequence output must be inside Git-ignored {LOCAL_ROOT}.") from exc
         sequence = tuple(args.sequence.split(","))
+        durations: dict[str, float] = {}
+        for specification in args.step_duration:
+            if "=" not in specification:
+                raise SimulationSequenceError("step-duration must use LABEL=SECONDS format.")
+            label, raw_duration = specification.split("=", 1)
+            if label in durations:
+                raise SimulationSequenceError(f"step-duration supplied more than once for label: {label}")
+            try:
+                durations[label] = float(raw_duration)
+            except ValueError as exc:
+                raise SimulationSequenceError(f"step-duration must use a finite numeric value: {specification}") from exc
         regions, goals = load_sequence_inputs(args.semantic_regions, args.safe_goals)
-        plan, result = build_simulation_sequence(regions, goals, sequence)
+        plan, result = build_simulation_sequence(
+            regions, goals, sequence, fail_label=args.fail_label,
+            cancel_before_label=args.cancel_before_label,
+            timeout_seconds=args.timeout_seconds, step_durations=durations,
+        )
         paths = write_simulation_sequence_artifacts(output, plan, result)
         print(f"plan: {paths['plan']}")
         print(f"result: {paths['result']}")

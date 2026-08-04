@@ -124,6 +124,40 @@ def _validate_sequence(sequence: Iterable[str]) -> tuple[str, ...]:
     return labels
 
 
+def _finite_control(value: Any, name: str, *, positive: bool = False) -> float:
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(float(value)):
+        raise SimulationSequenceError(f"{name} must be a finite number.")
+    numeric = float(value)
+    if positive and numeric <= 0:
+        raise SimulationSequenceError(f"{name} must be greater than zero.")
+    if not positive and numeric < 0:
+        raise SimulationSequenceError(f"{name} must be non-negative.")
+    return numeric
+
+
+def _validate_controls(
+    requested: tuple[str, ...],
+    *,
+    fail_label: str | None,
+    cancel_before_label: str | None,
+    timeout_seconds: float | None,
+    step_durations: dict[str, float] | None,
+) -> tuple[float | None, dict[str, float]]:
+    if fail_label is not None and fail_label not in requested:
+        raise SimulationSequenceError("fail-label must belong to the requested sequence.")
+    if cancel_before_label is not None and cancel_before_label not in requested:
+        raise SimulationSequenceError("cancel-before-label must belong to the requested sequence.")
+    if fail_label is not None and fail_label == cancel_before_label:
+        raise SimulationSequenceError("fail-label and cancel-before-label cannot target the same step.")
+    timeout = None if timeout_seconds is None else _finite_control(timeout_seconds, "timeout-seconds", positive=True)
+    durations: dict[str, float] = {}
+    for label, duration in (step_durations or {}).items():
+        if label not in requested:
+            raise SimulationSequenceError("step-duration label must belong to the requested sequence.")
+        durations[label] = _finite_control(duration, f"step-duration {label}")
+    return timeout, durations
+
+
 def _region_index(document: dict[str, Any]) -> dict[str, dict[str, Any]]:
     records = document.get("regions")
     if not isinstance(records, list):
@@ -229,10 +263,24 @@ def _require_selector_evidence(goal: dict[str, Any]) -> None:
 
 
 def build_simulation_sequence(
-    regions_document: dict[str, Any], safe_goals_document: dict[str, Any], sequence: Iterable[str] = DEFAULT_SEQUENCE
+    regions_document: dict[str, Any],
+    safe_goals_document: dict[str, Any],
+    sequence: Iterable[str] = DEFAULT_SEQUENCE,
+    *,
+    fail_label: str | None = None,
+    cancel_before_label: str | None = None,
+    timeout_seconds: float | None = None,
+    step_durations: dict[str, float] | None = None,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
-    """Resolve labels by label and proposal/partition key, then simulate state transitions."""
+    """Resolve labels and synchronously simulate deterministic state transitions."""
     requested = _validate_sequence(sequence)
+    timeout, durations = _validate_controls(
+        requested,
+        fail_label=fail_label,
+        cancel_before_label=cancel_before_label,
+        timeout_seconds=timeout_seconds,
+        step_durations=step_durations,
+    )
     region_identity = _map_identity(regions_document, "semantic regions")
     goal_identity = _map_identity(safe_goals_document, "safe goals")
     if region_identity != goal_identity:
@@ -242,13 +290,13 @@ def build_simulation_sequence(
     plan_steps: list[dict[str, Any]] = []
     result_steps: list[dict[str, Any]] = []
     event_order = 1
-    for step_order, label in enumerate(requested, start=1):
-        region = regions.get(label)
-        goal = goals.get(label)
-        if region is None or goal is None:
-            raise SimulationSequenceError(f"requested label has no unique region and accepted safe goal: {label}")
+    upstream_terminal: str | None = None
+    overall_status = "succeeded"
+
+    def step_base(step_order: int, label: str) -> dict[str, Any]:
+        goal = goals[label]
         goal_data = goal["goal"]
-        step = {
+        return {
             "step_order": step_order,
             "label": label,
             "proposal_id": goal["proposal_id"],
@@ -260,26 +308,68 @@ def build_simulation_sequence(
             "goal_pixel": {"row": goal_data["pixel_row"], "column": goal_data["pixel_column"]},
             "goal_map": {"x": goal_data["map_x"], "y": goal_data["map_y"]},
             "clearance_m": goal_data["clearance_m"],
+            "simulated_duration_seconds": durations.get(label, 0.0),
+            "timeout_seconds": timeout,
             "review_only": True,
             "simulation_only": True,
             "executable": False,
         }
-        plan_steps.append({**step, "status": "pending"})
-        state_events = []
-        for status in ("pending", "running", "succeeded"):
-            state_events.append({"logical_event_order": event_order, "status": status})
+
+    def events(statuses: tuple[str, ...]) -> list[dict[str, Any]]:
+        nonlocal event_order
+        result_events = []
+        for status in statuses:
+            result_events.append({"logical_event_order": event_order, "status": status})
             event_order += 1
-        result_steps.append({**step, "status": "succeeded", "state_events": state_events})
+        return result_events
+
+    for step_order, label in enumerate(requested, start=1):
+        region = regions.get(label)
+        goal = goals.get(label)
+        if region is None or goal is None:
+            raise SimulationSequenceError(f"requested label has no unique region and accepted safe goal: {label}")
+        step = step_base(step_order, label)
+        plan_steps.append({**step, "status": "pending", "terminal_reason": None})
+        if upstream_terminal is not None:
+            terminal_reason = {
+                "failed": "upstream_failure",
+                "timed_out": "upstream_timeout",
+                "cancelled": "user_requested_cancel",
+            }[upstream_terminal]
+            result_steps.append({**step, "status": "cancelled", "terminal_reason": terminal_reason, "state_events": events(("pending", "cancelled"))})
+            continue
+        if cancel_before_label == label:
+            upstream_terminal = "cancelled"
+            overall_status = "cancelled"
+            result_steps.append({**step, "status": "cancelled", "terminal_reason": "user_requested_cancel", "state_events": events(("pending", "cancelled"))})
+            continue
+        if fail_label == label:
+            upstream_terminal = "failed"
+            overall_status = "failed"
+            result_steps.append({**step, "status": "failed", "terminal_reason": "simulated_failure", "state_events": events(("pending", "running", "failed"))})
+            continue
+        if timeout is not None and durations.get(label, 0.0) > timeout:
+            upstream_terminal = "timed_out"
+            overall_status = "timed_out"
+            result_steps.append({**step, "status": "timed_out", "terminal_reason": "timeout_exceeded", "state_events": events(("pending", "running", "timed_out"))})
+            continue
+        result_steps.append({**step, "status": "succeeded", "terminal_reason": None, "state_events": events(("pending", "running", "succeeded"))})
+    counts = {status: sum(step["status"] == status for step in result_steps) for status in ("succeeded", "failed", "timed_out", "cancelled")}
     plan = {
         "schema_version": "1.0", "simulation_only": True, "executable": False,
         "map_identity": region_identity, "requested_sequence": list(requested),
+        "fail_label": fail_label, "cancel_before_label": cancel_before_label,
+        "timeout_seconds": timeout, "step_durations": durations,
         "total_steps": len(plan_steps), "steps": plan_steps,
     }
     result = {
         "schema_version": "1.0", "simulation_only": True, "executable": False,
         "map_identity": region_identity, "requested_sequence": list(requested),
-        "total_steps": len(result_steps), "succeeded_steps": len(result_steps), "failed_steps": 0,
-        "overall_status": "succeeded", "steps": result_steps,
+        "fail_label": fail_label, "cancel_before_label": cancel_before_label,
+        "timeout_seconds": timeout, "step_durations": durations,
+        "total_steps": len(result_steps), "succeeded_steps": counts["succeeded"], "failed_steps": counts["failed"],
+        "timed_out_steps": counts["timed_out"], "cancelled_steps": counts["cancelled"],
+        "overall_status": overall_status, "steps": result_steps,
     }
     return plan, result
 

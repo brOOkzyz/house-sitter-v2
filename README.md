@@ -120,7 +120,22 @@ python3 scripts/run_simulation_sequence.py \
   --output-dir local_annotations/simulation_sequence_run_001
 ```
 
-The new output directory contains only `simulation_sequence_plan.json` (resolved pending steps) and `simulation_sequence_result.json` (the deterministic `pending -> running -> succeeded` logical event sequence). Every consumed demo goal must be a complete, internally consistent local selector artifact with strict map identity, selector evidence, `review_only: true`, `simulation_only: true`, and `executable: false`. This validates local artifact structure only: it does not re-run polygon/raster safety and provides no cryptographic provenance authentication. Every output step remains non-executable. This is not real room recognition or robot execution: it sends no ROS/Nav2 command and does not provide timeout, cancel, retry, or rollback handling; those remain future work.
+The new output directory contains only `simulation_sequence_plan.json` (resolved pending steps) and `simulation_sequence_result.json` (the deterministic logical event sequence). Every consumed demo goal must be a complete, internally consistent local selector artifact with strict map identity, selector evidence, `review_only: true`, `simulation_only: true`, and `executable: false`. This validates local artifact structure only: it does not re-run polygon/raster safety and provides no cryptographic provenance authentication. Every output step remains non-executable. This is not real room recognition or robot execution: it sends no ROS/Nav2 command.
+
+Failure injection is deterministic and uses no wall-clock waiting:
+
+```bash
+# normal
+python3 scripts/run_simulation_sequence.py --semantic-regions REGIONS.json --safe-goals GOALS.json --output-dir local_annotations/sequence_ok
+# failure
+python3 scripts/run_simulation_sequence.py --semantic-regions REGIONS.json --safe-goals GOALS.json --fail-label kitchen --output-dir local_annotations/sequence_failed
+# timeout
+python3 scripts/run_simulation_sequence.py --semantic-regions REGIONS.json --safe-goals GOALS.json --timeout-seconds 5 --step-duration bedroom=8 --output-dir local_annotations/sequence_timeout
+# user cancellation
+python3 scripts/run_simulation_sequence.py --semantic-regions REGIONS.json --safe-goals GOALS.json --cancel-before-label bedroom --output-dir local_annotations/sequence_cancelled
+```
+
+`fail`, `timeout`, and `cancel` are simulation injections, not real robot fault detection. Timeout uses `duration > timeout`; equality succeeds. Timeout, cancel, retry, and rollback are intentionally minimal/deferred behaviors, and no real navigation command is generated.
 
 ## Completed Modules
 

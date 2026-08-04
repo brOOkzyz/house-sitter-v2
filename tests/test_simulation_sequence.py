@@ -24,6 +24,10 @@ from house_sitter_core.simulation_sequence import (
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 LOCAL_ROOT = PROJECT_ROOT / "local_annotations"
 SCRIPT_PATH = PROJECT_ROOT / "scripts" / "run_simulation_sequence.py"
+RUNNER_SPEC = importlib.util.spec_from_file_location("sequence_runner", SCRIPT_PATH)
+runner = importlib.util.module_from_spec(RUNNER_SPEC)
+assert RUNNER_SPEC and RUNNER_SPEC.loader
+RUNNER_SPEC.loader.exec_module(runner)
 DEMO_TEST_PATH = PROJECT_ROOT / "tests" / "test_demo_semantic_map.py"
 DEMO_SPEC = importlib.util.spec_from_file_location("demo_test_support", DEMO_TEST_PATH)
 demo_tests = importlib.util.module_from_spec(DEMO_SPEC)
@@ -55,6 +59,45 @@ class SimulationSequenceTests(unittest.TestCase):
             [event["logical_event_order"] for step in result["steps"] for event in step["state_events"]],
             list(range(1, 13)),
         )
+
+    def test_simulated_failure_cancels_downstream_steps(self):
+        regions, goals = self.artifacts()
+        _, result = build_simulation_sequence(regions, goals, fail_label="kitchen")
+        self.assertEqual([step["status"] for step in result["steps"]], ["succeeded", "failed", "cancelled", "cancelled"])
+        self.assertEqual([step["terminal_reason"] for step in result["steps"]], [None, "simulated_failure", "upstream_failure", "upstream_failure"])
+        self.assertEqual((result["overall_status"], result["succeeded_steps"], result["failed_steps"], result["timed_out_steps"], result["cancelled_steps"]), ("failed", 1, 1, 0, 2))
+
+    def test_timeout_cancels_downstream_and_equal_duration_succeeds(self):
+        regions, goals = self.artifacts()
+        _, timed_out = build_simulation_sequence(regions, goals, timeout_seconds=5, step_durations={"bedroom": 8})
+        self.assertEqual([step["status"] for step in timed_out["steps"]], ["succeeded", "succeeded", "timed_out", "cancelled"])
+        self.assertEqual([step["terminal_reason"] for step in timed_out["steps"]], [None, None, "timeout_exceeded", "upstream_timeout"])
+        self.assertEqual(timed_out["overall_status"], "timed_out")
+        _, equal = build_simulation_sequence(regions, goals, timeout_seconds=5, step_durations={"bedroom": 5})
+        self.assertEqual([step["status"] for step in equal["steps"]], ["succeeded"] * 4)
+
+    def test_user_cancel_marks_target_and_downstream_cancelled(self):
+        regions, goals = self.artifacts()
+        _, result = build_simulation_sequence(regions, goals, cancel_before_label="bedroom")
+        self.assertEqual([step["status"] for step in result["steps"]], ["succeeded", "succeeded", "cancelled", "cancelled"])
+        self.assertEqual([step["terminal_reason"] for step in result["steps"]], [None, None, "user_requested_cancel", "user_requested_cancel"])
+        self.assertEqual(result["overall_status"], "cancelled")
+
+    def test_control_validation_rejects_invalid_labels_numbers_and_conflicts(self):
+        regions, goals = self.artifacts()
+        invalid_calls = [
+            {"fail_label": "missing"}, {"cancel_before_label": "missing"},
+            {"timeout_seconds": 0}, {"timeout_seconds": float("nan")}, {"timeout_seconds": float("inf")},
+            {"step_durations": {"missing": 1}}, {"step_durations": {"living_room": -1}},
+            {"step_durations": {"living_room": float("nan")}}, {"fail_label": "kitchen", "cancel_before_label": "kitchen"},
+        ]
+        for controls in invalid_calls:
+            with self.subTest(controls=controls), self.assertRaises(SimulationSequenceError):
+                build_simulation_sequence(regions, goals, **controls)
+
+    def test_cli_rejects_duplicate_step_duration_without_traceback(self):
+        args = ["--semantic-regions", "missing-regions.json", "--safe-goals", "missing-goals.json", "--output-dir", str(LOCAL_ROOT / "never-created"), "--step-duration", "kitchen=1", "--step-duration", "kitchen=2"]
+        self.assertEqual(runner.main(args), 2)
 
     def test_proposal_partition_and_source_provenance_are_preserved(self):
         regions, goals = self.artifacts()
