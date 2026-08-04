@@ -137,6 +137,20 @@ python3 scripts/run_simulation_sequence.py --semantic-regions REGIONS.json --saf
 
 `fail`, `timeout`, and `cancel` are simulation injections, not real robot fault detection. Timeout uses `duration > timeout`; equality succeeds. Timeout, cancel, retry, and rollback are intentionally minimal/deferred behaviors, and no real navigation command is generated.
 
+### Offline simulation-only evaluation
+
+`scripts/run_simulation_evaluation.py` repeatedly evaluates the existing synthetic safe-goal artifacts through the deterministic sequence executor. It runs the fixed `baseline_success`, `simulated_failure`, `simulated_timeout`, and `user_cancel` scenarios and writes CSV, JSON, Markdown, and SVG report artifacts only. It does not start ROS, Gazebo, Nav2, or a robot command path.
+
+```bash
+python3 scripts/run_simulation_evaluation.py \
+  --semantic-regions REGIONS.json \
+  --safe-goals GOALS.json \
+  --output-dir local_annotations/simulation_evaluation_run_001 \
+  --trials-per-scenario 10
+```
+
+The evaluation always uses the fixed four-step sequence `living_room`, `kitchen`, `bedroom`, `charging_area`; reordering, custom labels, and reduced sequences are not supported. The result is a reproducible simulation-state-machine evaluation, not a real robot navigation, Nav2, dynamic-obstacle, room-semantic, or fault-detection experiment. Inputs retain the sequence executor's strict map-identity, provenance, review-only, simulation-only, non-executable, and selector-evidence validation. Evaluation accepts only structurally valid and internally consistent selector-style artifacts; it does not authenticate file provenance and is intended for a local simulation-only review pipeline. Complete internally consistent imitations are outside this threat model.
+
 ### Static Gazebo Sim visualization
 
 The first 3D visualization prototype is a separate static, simulation-only view. It reads the existing synthetic region and accepted safe-goal artifacts, materializes the installed TurtleBot4 Jazzy standard Xacro as a static model, and generates a small independent SDF world with colored region edges and goal markers. It does not use the system warehouse world, does not start ROS/Nav2/RViz, and sends no robot commands.
