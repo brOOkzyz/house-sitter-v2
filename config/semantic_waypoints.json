@@ -13,6 +13,10 @@
       "simulation_only": true,
       "validated": true,
       "grounding_mode": "simulation_safe_nearby_goal",
+      "mapping_status": "unmapped",
+      "frame_id": null,
+      "geometry": null,
+      "source": null,
       "execution_target": {
         "type": "simulation_safe_nearby_goal",
         "script": "scripts/run_sim_nav2_micro_smoke.py"
@@ -30,6 +34,10 @@
       "simulation_only": true,
       "validated": true,
       "grounding_mode": "simulation_safe_nearby_goal",
+      "mapping_status": "unmapped",
+      "frame_id": null,
+      "geometry": null,
+      "source": null,
       "execution_target": {
         "type": "simulation_safe_nearby_goal",
         "script": "scripts/run_sim_nav2_micro_smoke.py"
@@ -43,6 +51,10 @@
       "simulation_only": true,
       "validated": true,
       "grounding_mode": "simulation_safe_nearby_goal",
+      "mapping_status": "unmapped",
+      "frame_id": null,
+      "geometry": null,
+      "source": null,
       "execution_target": {
         "type": "simulation_safe_nearby_goal",
         "script": "scripts/run_sim_nav2_micro_smoke.py"
@@ -56,6 +68,10 @@
       "simulation_only": true,
       "validated": true,
       "grounding_mode": "simulation_safe_nearby_goal",
+      "mapping_status": "unmapped",
+      "frame_id": null,
+      "geometry": null,
+      "source": null,
       "execution_target": {
         "type": "simulation_safe_nearby_goal",
         "script": "scripts/run_sim_nav2_micro_smoke.py"
@@ -71,6 +87,10 @@
       "simulation_only": true,
       "validated": true,
       "grounding_mode": "simulation_safe_nearby_goal",
+      "mapping_status": "unmapped",
+      "frame_id": null,
+      "geometry": null,
+      "source": null,
       "execution_target": {
         "type": "simulation_safe_nearby_goal",
         "script": "scripts/run_sim_nav2_micro_smoke.py"
@@ -86,6 +106,10 @@
       "simulation_only": true,
       "validated": true,
       "grounding_mode": "simulation_safe_nearby_goal",
+      "mapping_status": "unmapped",
+      "frame_id": null,
+      "geometry": null,
+      "source": null,
       "execution_target": {
         "type": "simulation_safe_nearby_goal",
         "script": "scripts/run_sim_nav2_micro_smoke.py"
@@ -103,6 +127,10 @@
       "simulation_only": true,
       "validated": true,
       "grounding_mode": "simulation_safe_nearby_goal",
+      "mapping_status": "unmapped",
+      "frame_id": null,
+      "geometry": null,
+      "source": null,
       "execution_target": {
         "type": "simulation_safe_nearby_goal",
         "script": "scripts/run_sim_nav2_micro_smoke.py"
@@ -121,6 +149,10 @@
       "simulation_only": true,
       "validated": true,
       "grounding_mode": "simulation_safe_nearby_goal",
+      "mapping_status": "unmapped",
+      "frame_id": null,
+      "geometry": null,
+      "source": null,
       "execution_target": {
         "type": "simulation_safe_nearby_goal",
         "script": "scripts/run_sim_nav2_micro_smoke.py"

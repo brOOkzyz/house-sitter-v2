@@ -18,6 +18,8 @@ from .nav2_client import (
 )
 from .planner import MockPlanner
 from .semantic_waypoints import (
+    PolygonGeometry,
+    SemanticArea,
     SemanticWaypointError,
     SemanticWaypointRegistry,
     resolve_semantic_label,
@@ -44,6 +46,8 @@ __all__ = [
     "RealLLMPlannerProvider",
     "VerifiedPlannerAdapter",
     "SemanticWaypointError",
+    "PolygonGeometry",
+    "SemanticArea",
     "SemanticWaypointRegistry",
     "resolve_semantic_label",
     "semantic_label_exists",

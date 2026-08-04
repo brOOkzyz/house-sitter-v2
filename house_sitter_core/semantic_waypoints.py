@@ -4,19 +4,46 @@ from __future__ import annotations
 
 import copy
 import json
+import math
 import re
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Tuple
 
 
 DEFAULT_REGISTRY_PATH = (
     Path(__file__).resolve().parents[1] / "config" / "semantic_waypoints.json"
 )
 FORBIDDEN_COORDINATE_FIELDS = frozenset({"x", "y", "yaw", "pose", "coordinates"})
+MAPPING_STATUSES = frozenset({"unmapped", "mapped"})
+GEOMETRY_EPSILON = 1e-12
+# Segment-contact tolerance is deliberately smaller than the minimum accepted
+# polygon area so a valid, very small polygon is not mistaken for collinear edges.
+INTERSECTION_EPSILON = 1e-15
+ANNOTATION_SOURCE_FIELDS = frozenset({"type", "map_id"})
 
 
 class SemanticWaypointError(ValueError):
     """Raised when a semantic waypoint label is missing or unsafe."""
+
+
+@dataclass(frozen=True)
+class PolygonGeometry:
+    """A user-annotated polygon expressed in a named map frame."""
+
+    frame_id: str
+    vertices: Tuple[Tuple[float, float], ...]
+
+
+@dataclass(frozen=True)
+class SemanticArea:
+    """Validated local semantic-area metadata; never supplied by an LLM."""
+
+    label: str
+    mapping_status: str
+    grounding_mode: str
+    geometry: Optional[PolygonGeometry]
+    map_id: Optional[str]
 
 
 class SemanticWaypointRegistry:
@@ -25,7 +52,7 @@ class SemanticWaypointRegistry:
     def __init__(self, path: Path = DEFAULT_REGISTRY_PATH) -> None:
         self.path = path
         self.config = self._load_json(path)
-        self.labels, self.alias_lookup = self._validate_config(self.config)
+        self.labels, self.alias_lookup, self.areas = self._validate_config(self.config)
 
     @staticmethod
     def _load_json(path: Path) -> Dict[str, Any]:
@@ -79,10 +106,186 @@ class SemanticWaypointRegistry:
             "matched_alias": matched_alias,
         }
 
+    @staticmethod
+    def _as_finite_coordinate(label: str, index: int, value: Any) -> Tuple[float, float]:
+        if not isinstance(value, (list, tuple)) or len(value) != 2:
+            raise SemanticWaypointError(
+                f"Semantic area {label} polygon vertex {index} must contain exactly two coordinates."
+            )
+        coordinates = []
+        for coordinate in value:
+            if isinstance(coordinate, bool) or not isinstance(coordinate, (int, float)):
+                raise SemanticWaypointError(
+                    f"Semantic area {label} polygon coordinates must be finite numbers."
+                )
+            numeric = float(coordinate)
+            if not math.isfinite(numeric):
+                raise SemanticWaypointError(
+                    f"Semantic area {label} polygon coordinates must be finite numbers."
+                )
+            coordinates.append(numeric)
+        return coordinates[0], coordinates[1]
+
+    @staticmethod
+    def _signed_area(vertices: Tuple[Tuple[float, float], ...]) -> float:
+        return sum(
+            x1 * y2 - x2 * y1
+            for (x1, y1), (x2, y2) in zip(vertices, vertices[1:] + vertices[:1])
+        ) / 2.0
+
+    @staticmethod
+    def _orientation(
+        first: Tuple[float, float], second: Tuple[float, float], third: Tuple[float, float]
+    ) -> float:
+        return (second[0] - first[0]) * (third[1] - first[1]) - (
+            second[1] - first[1]
+        ) * (third[0] - first[0])
+
+    @classmethod
+    def _point_on_segment(
+        cls,
+        first: Tuple[float, float],
+        second: Tuple[float, float],
+        point: Tuple[float, float],
+    ) -> bool:
+        """Return whether point lies on the closed segment, within the shared tolerance."""
+        return (
+            abs(cls._orientation(first, second, point)) <= INTERSECTION_EPSILON
+            and min(first[0], second[0]) - INTERSECTION_EPSILON
+            <= point[0]
+            <= max(first[0], second[0]) + INTERSECTION_EPSILON
+            and min(first[1], second[1]) - INTERSECTION_EPSILON
+            <= point[1]
+            <= max(first[1], second[1]) + INTERSECTION_EPSILON
+        )
+
+    @classmethod
+    def _segments_intersect_or_touch(
+        cls,
+        first: Tuple[float, float],
+        second: Tuple[float, float],
+        third: Tuple[float, float],
+        fourth: Tuple[float, float],
+    ) -> bool:
+        """Detect every intersection, overlap, or endpoint touch between two segments."""
+        first_orientation = cls._orientation(first, second, third)
+        second_orientation = cls._orientation(first, second, fourth)
+        third_orientation = cls._orientation(third, fourth, first)
+        fourth_orientation = cls._orientation(third, fourth, second)
+
+        if (
+            (abs(first_orientation) <= INTERSECTION_EPSILON and cls._point_on_segment(first, second, third))
+            or (abs(second_orientation) <= INTERSECTION_EPSILON and cls._point_on_segment(first, second, fourth))
+            or (abs(third_orientation) <= INTERSECTION_EPSILON and cls._point_on_segment(third, fourth, first))
+            or (abs(fourth_orientation) <= INTERSECTION_EPSILON and cls._point_on_segment(third, fourth, second))
+        ):
+            return True
+
+        return (
+            (first_orientation > INTERSECTION_EPSILON and second_orientation < -INTERSECTION_EPSILON)
+            or (first_orientation < -INTERSECTION_EPSILON and second_orientation > INTERSECTION_EPSILON)
+        ) and (
+            (third_orientation > INTERSECTION_EPSILON and fourth_orientation < -INTERSECTION_EPSILON)
+            or (third_orientation < -INTERSECTION_EPSILON and fourth_orientation > INTERSECTION_EPSILON)
+        )
+
+    @classmethod
+    def _polygon_is_simple(cls, vertices: Tuple[Tuple[float, float], ...]) -> bool:
+        """Ensure non-adjacent polygon edges neither cross, touch, nor overlap."""
+        count = len(vertices)
+        for first in range(count):
+            first_end = (first + 1) % count
+            for second in range(first + 1, count):
+                second_end = (second + 1) % count
+                shared_vertices = {first, first_end}.intersection({second, second_end})
+                if shared_vertices:
+                    # Adjacent edges may meet at their one expected vertex, but may
+                    # not retrace or overlap beyond it.
+                    first_other = next(index for index in (first, first_end) if index not in shared_vertices)
+                    second_other = next(index for index in (second, second_end) if index not in shared_vertices)
+                    if cls._point_on_segment(
+                        vertices[first], vertices[first_end], vertices[second_other]
+                    ) or cls._point_on_segment(
+                        vertices[second], vertices[second_end], vertices[first_other]
+                    ):
+                        return False
+                    continue
+                if cls._segments_intersect_or_touch(
+                    vertices[first], vertices[first_end], vertices[second], vertices[second_end]
+                ):
+                    return False
+        return True
+
+    @classmethod
+    def _vertices_are_collinear(cls, vertices: Tuple[Tuple[float, float], ...]) -> bool:
+        first, second = vertices[0], vertices[1]
+        return all(
+            abs(cls._orientation(first, second, vertex)) <= INTERSECTION_EPSILON
+            for vertex in vertices[2:]
+        )
+
+    @classmethod
+    def _validate_polygon(
+        cls, label: str, frame_id: Any, geometry: Any
+    ) -> PolygonGeometry:
+        if not isinstance(frame_id, str) or not frame_id.strip():
+            raise SemanticWaypointError(f"Semantic area {label} frame_id must be a non-empty string.")
+        if not isinstance(geometry, dict) or geometry.get("type") != "polygon":
+            raise SemanticWaypointError(f"Semantic area {label} geometry.type must be polygon.")
+        raw_vertices = geometry.get("vertices")
+        if not isinstance(raw_vertices, list):
+            raise SemanticWaypointError(f"Semantic area {label} polygon vertices must be a list.")
+        vertices = tuple(
+            cls._as_finite_coordinate(label, index, value)
+            for index, value in enumerate(raw_vertices, start=1)
+        )
+        # A single exact closing vertex is conventional JSON polygon syntax.  It is
+        # removed before validation; near-equal vertices remain ordinary vertices.
+        if len(vertices) > 1 and vertices[0] == vertices[-1]:
+            vertices = vertices[:-1]
+        if len(vertices) < 3 or len(set(vertices)) < 3:
+            raise SemanticWaypointError(
+                f"Semantic area {label} polygon must contain at least three distinct vertices."
+            )
+        if len(set(vertices)) != len(vertices):
+            raise SemanticWaypointError(f"Semantic area {label} polygon vertices must not repeat.")
+        if cls._vertices_are_collinear(vertices):
+            raise SemanticWaypointError(f"Semantic area {label} polygon area must be greater than zero.")
+        if not cls._polygon_is_simple(vertices):
+            raise SemanticWaypointError(f"Semantic area {label} polygon must not self-intersect.")
+        if abs(cls._signed_area(vertices)) <= GEOMETRY_EPSILON:
+            raise SemanticWaypointError(f"Semantic area {label} polygon area must be greater than zero.")
+        return PolygonGeometry(frame_id=frame_id, vertices=vertices)
+
+    @staticmethod
+    def _validate_annotation_source(label: str, source: Any) -> str:
+        if not isinstance(source, dict) or set(source) != ANNOTATION_SOURCE_FIELDS:
+            raise SemanticWaypointError(
+                f"Semantic area {label} source fields must be exactly type and map_id."
+            )
+        if source["type"] != "user_annotation":
+            raise SemanticWaypointError(
+                f"Semantic area {label} source.type must be user_annotation."
+            )
+        map_id = source["map_id"]
+        if (
+            not isinstance(map_id, str)
+            or not map_id.strip()
+            or map_id != map_id.strip()
+        ):
+            raise SemanticWaypointError(
+                f"Semantic area {label} source.map_id must be a non-empty string without leading or trailing whitespace."
+            )
+        return map_id
+
     @classmethod
     def _validate_config(
         cls, config: Dict[str, Any]
-    ) -> tuple[Dict[str, Dict[str, Any]], Dict[str, Dict[str, Optional[str]]]]:
+    ) -> tuple[
+        Dict[str, Dict[str, Any]],
+        Dict[str, Dict[str, Optional[str]]],
+        Dict[str, SemanticArea],
+    ]:
         if config.get("schema_version") != "1.0":
             raise SemanticWaypointError("Unsupported semantic waypoint schema_version.")
         if config.get("simulation_only") is not True:
@@ -94,6 +297,7 @@ class SemanticWaypointRegistry:
 
         validated: Dict[str, Dict[str, Any]] = {}
         alias_lookup: Dict[str, Dict[str, Optional[str]]] = {}
+        areas: Dict[str, SemanticArea] = {}
         for key, entry in labels.items():
             if not isinstance(key, str) or not key.strip():
                 raise SemanticWaypointError("Semantic waypoint label keys must be strings.")
@@ -109,14 +313,39 @@ class SemanticWaypointRegistry:
                 )
             if entry.get("validated") is not True:
                 raise SemanticWaypointError(f"Semantic waypoint {key} is not validated.")
-            if entry.get("grounding_mode") != "simulation_safe_nearby_goal":
+            grounding_mode = entry.get("grounding_mode")
+            if grounding_mode not in {"simulation_safe_nearby_goal", "user_labelled_map_area"}:
                 raise SemanticWaypointError(
                     f"Semantic waypoint {key} has unsupported grounding_mode."
                 )
+            mapping_status = entry.get("mapping_status")
+            if mapping_status not in MAPPING_STATUSES:
+                raise SemanticWaypointError(
+                    f"Semantic area {key} mapping_status must be mapped or unmapped."
+                )
             if FORBIDDEN_COORDINATE_FIELDS.intersection(entry):
                 raise SemanticWaypointError(
-                    f"Semantic waypoint {key} must not contain coordinates."
+                    f"Semantic waypoint {key} must not contain direct coordinate fields."
                 )
+
+            if mapping_status == "mapped":
+                if grounding_mode != "user_labelled_map_area":
+                    raise SemanticWaypointError(
+                        f"Semantic area {key} mapped entries must use user_labelled_map_area."
+                    )
+                polygon = cls._validate_polygon(key, entry.get("frame_id"), entry.get("geometry"))
+                map_id = cls._validate_annotation_source(key, entry.get("source"))
+            else:
+                if grounding_mode != "simulation_safe_nearby_goal":
+                    raise SemanticWaypointError(
+                        f"Semantic area {key} unmapped entries must use simulation_safe_nearby_goal."
+                    )
+                if any(entry.get(field) is not None for field in ("frame_id", "geometry", "source")):
+                    raise SemanticWaypointError(
+                        f"Semantic area {key} unmapped entries must not contain map geometry."
+                    )
+                polygon = None
+                map_id = None
 
             execution_target = entry.get("execution_target")
             if not isinstance(execution_target, dict):
@@ -153,7 +382,14 @@ class SemanticWaypointRegistry:
             validated_entry = copy.deepcopy(entry)
             validated_entry["aliases"] = validated_aliases
             validated[key] = validated_entry
-        return validated, alias_lookup
+            areas[key] = SemanticArea(
+                label=key,
+                mapping_status=mapping_status,
+                grounding_mode=grounding_mode,
+                geometry=polygon,
+                map_id=map_id,
+            )
+        return validated, alias_lookup, areas
 
     def has_label(self, label: str) -> bool:
         if not isinstance(label, str) or not label.strip():

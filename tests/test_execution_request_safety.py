@@ -99,6 +99,10 @@ class ExecutionRequestSafetyTests(unittest.TestCase):
                                 "simulation_only": True,
                                 "validated": True,
                                 "grounding_mode": "simulation_safe_nearby_goal",
+                                "mapping_status": "unmapped",
+                                "frame_id": None,
+                                "geometry": None,
+                                "source": None,
                                 "execution_target": {
                                     "type": "simulation_safe_nearby_goal",
                                     "script": "scripts/run_sim_nav2_micro_smoke.py",

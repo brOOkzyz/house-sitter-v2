@@ -25,6 +25,18 @@ The existing schema version `1.0` now supports ordered plans of one to five `nav
 
 `PlanVerifier` remains mandatory for every step. The complete plan is schema-checked, allowlist-checked, grounded, normalized, and verified before any simulation execution request is created. If one step is empty, unknown, unsafe, or otherwise invalid, the entire plan is rejected and no partial execution requests are retained. Execution requests contain canonical labels only. The project remains simulation-only.
 
+## User-annotated Semantic Areas
+
+Semantic labels and aliases are local registry data, not map knowledge supplied by Gemini or another LLM. The registry can represent either an `unmapped` `simulation_safe_nearby_goal` placeholder or a `mapped` `user_labelled_map_area`. A mapped entry requires a user-provided polygon in a named map frame and a `source` with `type: user_annotation` and a map identifier. The production registry currently contains only explicit unmapped placeholders: it has no room polygons or claimed kitchen, hallway, or bedroom coordinates.
+
+Inspect this metadata without executing any robot action:
+
+```bash
+python3 scripts/inspect_semantic_areas.py
+```
+
+Future work may select a safe reachable goal from a validated user polygon. This phase performs neither safe-goal selection nor Nav2 execution.
+
 ## Completed Modules
 
 - JSON-only LLM planning with atomic one-to-five-step semantic navigation

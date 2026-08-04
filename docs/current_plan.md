@@ -23,6 +23,12 @@ The plan schema remains at version `1.0` and accepts one to five ordered `naviga
 
 Before request construction, `PlanVerifier` performs schema and allowlist checks, local alias normalization, canonical grounding, and mandatory verification for every step. Verification is atomic at plan level: one invalid step rejects the entire plan, creates zero execution requests, and prevents partial execution. The project remains simulation-only.
 
+## User-annotated Semantic Area Data
+
+`config/semantic_waypoints.json` now distinguishes explicit `unmapped` simulation-only placeholders from `mapped` `user_labelled_map_area` entries. A mapped area must contain a user annotation polygon in a named map frame and identify its annotated map through `source.type: user_annotation` and `source.map_id`. LLM output remains limited to semantic labels and aliases; it cannot provide geometry, coordinates, frames, or navigation goals.
+
+The current production registry deliberately has no room polygons because no user-confirmed room annotations have been supplied. `tests/fixtures/semantic_areas_test.json` contains fictional coordinates solely for unit tests and is never loaded by default. A later phase may select a safe reachable target from validated polygons; this phase does not select goals or execute Nav2.
+
 ## Completed Modules
 
 - JSON-only LLM planning with atomic one-to-five-step semantic navigation

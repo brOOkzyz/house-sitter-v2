@@ -60,6 +60,10 @@ class SemanticWaypointTests(unittest.TestCase):
             "simulation_only",
             "validated",
             "grounding_mode",
+            "mapping_status",
+            "frame_id",
+            "geometry",
+            "source",
             "execution_target",
             "explanation",
         }
@@ -72,6 +76,10 @@ class SemanticWaypointTests(unittest.TestCase):
                 self.assertTrue(entry["simulation_only"])
                 self.assertTrue(entry["validated"])
                 self.assertEqual(entry["grounding_mode"], "simulation_safe_nearby_goal")
+                self.assertEqual(entry["mapping_status"], "unmapped")
+                self.assertIsNone(entry["frame_id"])
+                self.assertIsNone(entry["geometry"])
+                self.assertIsNone(entry["source"])
                 self.assertEqual(
                     entry["execution_target"],
                     {
@@ -173,6 +181,10 @@ class SemanticWaypointTests(unittest.TestCase):
                                 "simulation_only": True,
                                 "validated": True,
                                 "grounding_mode": "simulation_safe_nearby_goal",
+                                "mapping_status": "unmapped",
+                                "frame_id": None,
+                                "geometry": None,
+                                "source": None,
                                 "execution_target": {
                                     "type": "simulation_safe_nearby_goal",
                                     "script": "scripts/run_sim_nav2_micro_smoke.py",
@@ -186,6 +198,10 @@ class SemanticWaypointTests(unittest.TestCase):
                                 "simulation_only": True,
                                 "validated": True,
                                 "grounding_mode": "simulation_safe_nearby_goal",
+                                "mapping_status": "unmapped",
+                                "frame_id": None,
+                                "geometry": None,
+                                "source": None,
                                 "execution_target": {
                                     "type": "simulation_safe_nearby_goal",
                                     "script": "scripts/run_sim_nav2_micro_smoke.py",
@@ -216,6 +232,10 @@ class SemanticWaypointTests(unittest.TestCase):
                                 "simulation_only": True,
                                 "validated": True,
                                 "grounding_mode": "simulation_safe_nearby_goal",
+                                "mapping_status": "unmapped",
+                                "frame_id": None,
+                                "geometry": None,
+                                "source": None,
                                 "execution_target": {
                                     "type": "simulation_safe_nearby_goal",
                                     "script": "scripts/run_sim_nav2_micro_smoke.py",

@@ -1,0 +1,63 @@
+{
+  "schema_version": "1.0",
+  "simulation_only": true,
+  "test_fixture": true,
+  "labels": {
+    "hallway": {
+      "label": "hallway",
+      "aliases": ["corridor"],
+      "description": "Fictional test-only hallway polygon.",
+      "simulation_only": true,
+      "validated": true,
+      "grounding_mode": "user_labelled_map_area",
+      "mapping_status": "mapped",
+      "frame_id": "map",
+      "geometry": {"type": "polygon", "vertices": [[0.0, 0.0], [2.0, 0.0], [1.0, 1.0]]},
+      "source": {"type": "user_annotation", "map_id": "test_house_map"},
+      "execution_target": {"type": "simulation_safe_nearby_goal", "script": "scripts/run_sim_nav2_micro_smoke.py"},
+      "explanation": "Fictional coordinates for unit tests only; never used for execution."
+    },
+    "kitchen": {
+      "label": "kitchen",
+      "aliases": ["cooking area"],
+      "description": "Fictional test-only kitchen polygon.",
+      "simulation_only": true,
+      "validated": true,
+      "grounding_mode": "user_labelled_map_area",
+      "mapping_status": "mapped",
+      "frame_id": "map",
+      "geometry": {"type": "polygon", "vertices": [[3.0, 0.0], [5.0, 0.0], [5.0, 2.0], [3.0, 2.0]]},
+      "source": {"type": "user_annotation", "map_id": "test_house_map"},
+      "execution_target": {"type": "simulation_safe_nearby_goal", "script": "scripts/run_sim_nav2_micro_smoke.py"},
+      "explanation": "Fictional coordinates for unit tests only; never used for execution."
+    },
+    "bedroom": {
+      "label": "bedroom",
+      "aliases": ["sleeping room"],
+      "description": "Fictional test-only bedroom polygon.",
+      "simulation_only": true,
+      "validated": true,
+      "grounding_mode": "user_labelled_map_area",
+      "mapping_status": "mapped",
+      "frame_id": "map",
+      "geometry": {"type": "polygon", "vertices": [[0.0, 3.0], [2.0, 3.0], [2.0, 5.0], [0.0, 5.0]]},
+      "source": {"type": "user_annotation", "map_id": "test_house_map"},
+      "execution_target": {"type": "simulation_safe_nearby_goal", "script": "scripts/run_sim_nav2_micro_smoke.py"},
+      "explanation": "Fictional coordinates for unit tests only; never used for execution."
+    },
+    "charging_area": {
+      "label": "charging_area",
+      "aliases": ["charger"],
+      "description": "Unmapped placeholder retained for compatibility tests.",
+      "simulation_only": true,
+      "validated": true,
+      "grounding_mode": "simulation_safe_nearby_goal",
+      "mapping_status": "unmapped",
+      "frame_id": null,
+      "geometry": null,
+      "source": null,
+      "execution_target": {"type": "simulation_safe_nearby_goal", "script": "scripts/run_sim_nav2_micro_smoke.py"},
+      "explanation": "No user map annotation has been supplied."
+    }
+  }
+}
