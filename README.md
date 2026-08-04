@@ -89,9 +89,24 @@ python3 scripts/select_safe_goals.py \
 
 The output directory must not already exist. Overwrite, force, backup, and rollback are deliberately unsupported: all three artifacts are created in a sibling temporary directory, then published by one rename; failures clean only the unpublished temporary directory. The tool writes exactly `safe_goal_candidates.json`, `rejected_safe_goals.json`, and `safe_goal_preview.png`.
 
-Each accepted point passes the current geometry validator, bounds validation, full strict-interior raster evaluation, and final goal assertion. Raster counts and ratios are `null` when raster evaluation did not run. Accepted and rejected records carry locally computed `faster_safety_passed`; rejected records are always false. `goal_order` is final contiguous 1-based order, `source_candidate_order` is the original JSON-array position, and `source_selection_rank` preserves the source value or null. Duplicate polygons are rejected; distinct polygons selecting the same pixel retain the first stable `(proposal_id, partition_id)` candidate.
+Each accepted point passes the current geometry validator, bounds validation, full strict-interior raster evaluation, and final goal assertion. Raster counts and ratios are `null` when raster evaluation did not run. Accepted and rejected records carry locally computed `faster_safety_passed`; rejected records are always false. In the synthetic demo, `source_candidate_order` is the original candidate JSON 1-based position, `source_selection_rank` is the upstream `selection_rank` or `null`, `demo_assignment_order` is the fixed label assignment order 1-4, and `goal_order` is the final accepted-goal order 1-4. Duplicate polygons are rejected; distinct polygons selecting the same pixel retain the first stable `(proposal_id, partition_id)` candidate.
 
 Results are review-only observed free-space goals, not rooms, not semantic annotations, and not executable navigation commands. The tool never modifies maps or the production registry, starts ROS/Gazebo/Nav2, or sends movement commands. The warehouse remains a technical validation map, never a residential semantic map.
+
+### Synthetic demo semantic labels
+
+`scripts/create_demo_semantic_map.py` is a separate, single-purpose dissertation-demo bridge. It consumes an existing map-bound proposal or all-safe-candidate JSON and automatically selects four distinct current-map-safe regions, then assigns the fixed arbitrary names `living_room`, `kitchen`, `bedroom`, and `charging_area`. No user polygon drawing or per-label entry is required.
+
+These are explicitly `demo_only`, `synthetic_semantics`, `ground_truth: false`, review-only labels—not room recognition, semantic segmentation, or a claim about the warehouse layout. They are never written to `config/semantic_waypoints.json`; a real deployment must obtain reliable semantics from a user, dataset, or perception module. The command only demonstrates the local label -> verified safe goal -> simulation-task data flow and does not start ROS, Gazebo, or Nav2.
+
+```bash
+python3 scripts/create_demo_semantic_map.py \
+  --map maps/minimal_slam_map.yaml \
+  --candidates local_annotations/current_map_safe_candidates.json \
+  --output-dir local_annotations/demo_semantic_run_001
+```
+
+The requested output directory must be new and under Git-ignored `local_annotations/`. It is published once from a sibling temporary directory and contains only the two PNG previews plus `demo_semantic_regions.json`, `safe_goal_candidates.json`, and `rejected_safe_goals.json`.
 
 ## Completed Modules
 

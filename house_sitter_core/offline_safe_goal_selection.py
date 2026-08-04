@@ -257,8 +257,12 @@ def _normalized_candidates(candidates: Iterable[dict[str, Any]]) -> list[tuple[d
         partition_ids.add(partition_id)
         # Copy rather than mutate caller JSON, and retain provenance before sorting.
         preserved = dict(candidate)
-        preserved["_source_candidate_order"] = source_order
-        preserved["_source_selection_rank"] = candidate.get("selection_rank")
+        # Demo callers may carry provenance captured at the original report
+        # boundary.  It is audit metadata only and never affects validation.
+        preserved["_source_candidate_order"] = candidate.get("_source_candidate_order", source_order)
+        preserved["_source_selection_rank"] = candidate.get(
+            "_source_selection_rank", candidate.get("selection_rank")
+        )
         normalized.append((preserved, proposal_id, partition_id))
     return sorted(normalized, key=lambda item: (item[1], item[2]))
 
@@ -376,8 +380,12 @@ def select_offline_safe_goals(
                 "goal_order": goal_order,
                 "source_candidate_order": candidate["_source_candidate_order"],
                 "source_selection_rank": candidate["_source_selection_rank"],
-                "canonical_label": None,
-                "suggested_label": "unassigned",
+                "demo_assignment_order": candidate.get("demo_assignment_order"),
+                # A caller may attach a local review label, but it never
+                # authorizes safety: the complete validation chain above has
+                # already run against the current map.
+                "canonical_label": candidate.get("canonical_label"),
+                "suggested_label": candidate.get("suggested_label", "unassigned"),
                 "status": "proposed",
                 "confirmed": False,
                 "review_only": True,
@@ -407,6 +415,9 @@ def select_offline_safe_goals(
                     "source_raster_safety_claim": candidate.get("raster_safety_passed"),
                     "source_faster_safety_claim": candidate.get("faster_safety_passed"),
                 },
+                "demo_only": bool(candidate.get("demo_only", False)),
+                "synthetic_semantics": bool(candidate.get("synthetic_semantics", False)),
+                "ground_truth": bool(candidate.get("ground_truth", False)),
             }
         )
     return OfflineSafeGoalSelectionResult(
