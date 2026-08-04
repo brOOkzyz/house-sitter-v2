@@ -108,6 +108,20 @@ python3 scripts/create_demo_semantic_map.py \
 
 The requested output directory must be new and under Git-ignored `local_annotations/`. It is published once from a sibling temporary directory and contains only the two PNG previews plus `demo_semantic_regions.json`, `safe_goal_candidates.json`, and `rejected_safe_goals.json`.
 
+### Simulation-only demo sequencer
+
+`scripts/run_simulation_sequence.py` consumes the two synthetic demo JSON artifacts and deterministically simulates the default ordered review sequence: `living_room`, `kitchen`, `bedroom`, `charging_area`. It resolves each label through matching `proposal_id` + `partition_id`, never through array position and never through hard-coded coordinates.
+
+```bash
+python3 scripts/run_simulation_sequence.py \
+  --semantic-regions local_annotations/demo_semantic_run_001/demo_semantic_regions.json \
+  --safe-goals local_annotations/demo_semantic_run_001/safe_goal_candidates.json \
+  --sequence living_room,kitchen,bedroom,charging_area \
+  --output-dir local_annotations/simulation_sequence_run_001
+```
+
+The new output directory contains only `simulation_sequence_plan.json` (resolved pending steps) and `simulation_sequence_result.json` (the deterministic `pending -> running -> succeeded` logical event sequence). Every consumed demo goal must be a complete, internally consistent local selector artifact with strict map identity, selector evidence, `review_only: true`, `simulation_only: true`, and `executable: false`. This validates local artifact structure only: it does not re-run polygon/raster safety and provides no cryptographic provenance authentication. Every output step remains non-executable. This is not real room recognition or robot execution: it sends no ROS/Nav2 command and does not provide timeout, cancel, retry, or rollback handling; those remain future work.
+
 ## Completed Modules
 
 - JSON-only LLM planning with atomic one-to-five-step semantic navigation

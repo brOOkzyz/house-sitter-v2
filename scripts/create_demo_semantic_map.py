@@ -158,7 +158,7 @@ def create_demo(metadata: Any, document: dict[str, Any]) -> tuple[dict[str, Any]
         goal = dict(by_label.get(label, {}))
         if not goal:
             raise DemoSemanticMapError("A labelled region did not retain its safe goal.")
-        goal.update({"goal_order": order, "demo_only": True, "synthetic_semantics": True, "ground_truth": False, "review_only": True, "executable": False})
+        goal.update({"goal_order": order, "demo_only": True, "synthetic_semantics": True, "ground_truth": False, "review_only": True, "simulation_only": True, "executable": False})
         goal["evidence"] = [*goal["evidence"], "automatic_synthetic_demo_assignment"]
         goals.append(goal)
     identity = map_identity(metadata).as_dict(); map_id = document.get("map_id")

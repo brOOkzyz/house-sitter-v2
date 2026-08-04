@@ -62,6 +62,8 @@ class DemoSemanticMapTests(unittest.TestCase):
             self.assertFalse(record["ground_truth"])
             self.assertTrue(record["review_only"])
             self.assertFalse(record["executable"])
+        for goal in goals["goals"]:
+            self.assertIs(goal["simulation_only"], True)
         self.assertIn("automatic_synthetic_demo_assignment", regions["provenance"])
 
     def test_fewer_than_four_safe_regions_fails_closed(self):

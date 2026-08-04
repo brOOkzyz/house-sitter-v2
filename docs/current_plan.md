@@ -72,6 +72,12 @@ Results are review-only observed free-space goals, not rooms, not semantic annot
 
 The result is expressly synthetic and not ground truth: every record is `demo_only`, `synthetic_semantics`, `ground_truth: false`, review-only, and non-executable, with `automatic_synthetic_demo_assignment` provenance. It does not perform real room recognition or semantic mapping and never writes the production registry. Reliable deployed semantics must come from a user, dataset, or perception component. This phase still does not start ROS, Gazebo, or Nav2; it only demonstrates label -> safe goal -> simulation-task data flow through local Git-ignored artifacts.
 
+### Deterministic simulation-only sequence
+
+`run_simulation_sequence.py` consumes the synthetic region and accepted safe-goal artifacts to simulate the fixed review order `living_room`, `kitchen`, `bedroom`, `charging_area`. It joins records by `proposal_id` and `partition_id`, preserves source provenance, verifies matching map identity, and writes only a resolved plan plus a deterministic logical result (`pending -> running -> succeeded`). It uses no ROS, Gazebo, Nav2, wall-clock waiting, or robot command.
+
+Both sequence artifacts remain review-only, simulation-only, and non-executable. The sequencer accepts only structurally complete and internally consistent local selector artifacts: strict matching map identity, strict demo flags, and complete selector evidence are required. It does not re-run polygon/raster safety and does not provide cryptographic artifact authentication; this remains a local review-only pipeline, never navigation authorization. Timeout, cancel, retry, and failure-handling behavior are intentionally deferred to the next phase. The CLI publishes exactly `simulation_sequence_plan.json` and `simulation_sequence_result.json` in a new Git-ignored local output directory.
+
 ## Completed Modules
 
 - JSON-only LLM planning with atomic one-to-five-step semantic navigation
