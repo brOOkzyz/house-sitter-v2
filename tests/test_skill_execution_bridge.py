@@ -11,7 +11,7 @@ from pathlib import Path
 from unittest import mock
 from types import ModuleType, SimpleNamespace
 
-from house_sitter_core.nav2_sim_bridge import FakeNavigationExecutor, NavigationGoal, NavigationOutcome, Nav2SimulationExecutor
+from house_sitter_core.nav2_sim_bridge import FakeNavigationExecutor, NavigationGoal, NavigationOutcome, Nav2SimulationExecutor, adaptive_timeout_from_feedback
 from house_sitter_core.skill_execution_bridge import SkillExecutionBridgeError, execute_skill_in_simulation, render_execution_artifacts, write_execution_artifacts
 from house_sitter_core.skill_planner import compile_skill_plan, create_skill_request
 from tests.skill_test_support import ROOT, demo_artifacts, write_artifacts
@@ -34,6 +34,22 @@ class SkillExecutionBridgeTests(unittest.TestCase):
         result, events = execute_skill_in_simulation(plan, request, None, dry_run=True)
         self.assertEqual(result["execution_mode"], "dry_run"); self.assertEqual(events, []); self.assertEqual(result["overall_status"], None)
         self.assertEqual(fake.sent_goals, [])
+        self.assertEqual((result["timeout_policy"], result["effective_timeout_seconds"], result["timeout_basis"]), ("adaptive", 30.0, "fallback"))
+
+    def test_adaptive_timeout_policy_uses_eta_distance_bounds_and_never_shortens(self):
+        self.assertEqual(adaptive_timeout_from_feedback(({"estimated_time_remaining_seconds": 40.0},)), (75.0, "estimated_time_remaining"))
+        self.assertEqual(adaptive_timeout_from_feedback(({"distance_remaining": 10.0},)), (90.0, "distance_remaining"))
+        self.assertEqual(adaptive_timeout_from_feedback(({"distance_remaining": 0.0},)), (30.0, "fallback"))
+        self.assertEqual(adaptive_timeout_from_feedback(({"estimated_time_remaining_seconds": 1.0},), 100.0), (100.0, "fallback"))
+        self.assertEqual(adaptive_timeout_from_feedback(({"estimated_time_remaining_seconds": 1000.0},)), (180.0, "estimated_time_remaining"))
+
+    def test_explicit_timeout_wins_and_artifacts_record_timeout_policy(self):
+        request, plan = self.plan()
+        result, events = execute_skill_in_simulation(plan, request, FakeNavigationExecutor([NavigationOutcome("succeeded", ({"estimated_time_remaining_seconds": 100.0},))]), timeout_seconds=7.0)
+        self.assertEqual((result["timeout_policy"], result["effective_timeout_seconds"], result["timeout_basis"]), ("explicit", 7.0, "user"))
+        contents = render_execution_artifacts(request, plan, result, events)
+        self.assertEqual(json.loads(contents["execution_result.json"])["timeout_policy"], "explicit")
+        self.assertIn("Effective timeout: `7.0`", contents["execution_report.md"])
 
     def test_fake_success_binds_accepted_goal_and_feedback_order(self):
         request, plan = self.plan()
@@ -141,6 +157,10 @@ class SkillExecutionBridgeTests(unittest.TestCase):
             bad = root / "bad"
             run = subprocess.run([sys.executable, str(SCRIPT), "--skill", "patrol_home", "--semantic-regions", str(regions), "--safe-goals", str(goals), "--output-dir", str(bad), "--timeout-seconds", "0"], cwd=ROOT, text=True, capture_output=True, check=False)
             self.assertEqual(run.returncode, 2); self.assertFalse(bad.exists()); self.assertNotIn("Traceback", run.stderr)
+            for value in ("nan", "inf"):
+                invalid = root / f"bad-{value}"
+                run = subprocess.run([sys.executable, str(SCRIPT), "--skill", "patrol_home", "--semantic-regions", str(regions), "--safe-goals", str(goals), "--output-dir", str(invalid), "--timeout-seconds", value], cwd=ROOT, text=True, capture_output=True, check=False)
+                self.assertEqual(run.returncode, 2); self.assertFalse(invalid.exists()); self.assertNotIn("Traceback", run.stderr)
             untrusted = json.loads(goals.read_text(encoding="utf-8")); untrusted["goals"][0]["review_only"] = False
             goals.write_text(json.dumps(untrusted), encoding="utf-8")
             rejected = root / "rejected"

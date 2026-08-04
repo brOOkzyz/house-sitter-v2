@@ -8,10 +8,15 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
+import math
+import time
 from typing import Any
 
 
 NAVIGATION_STATUSES = frozenset({"succeeded", "failed", "cancelled", "timed_out"})
+FALLBACK_TIMEOUT_SECONDS = 30.0
+MAX_TIMEOUT_SECONDS = 180.0
+DISTANCE_FALLBACK_SPEED_MPS = 0.20
 
 
 class NavigationError(RuntimeError):
@@ -34,10 +39,34 @@ class NavigationOutcome:
     status: str
     feedback: tuple[dict[str, Any], ...] = ()
     reason: str | None = None
+    effective_timeout_seconds: float | None = None
+    timeout_basis: str | None = None
 
     def __post_init__(self) -> None:
         if self.status not in NAVIGATION_STATUSES:
             raise NavigationError(f"unsupported navigation status: {self.status}")
+
+
+def adaptive_timeout_from_feedback(
+    feedback: tuple[dict[str, Any], ...] | list[dict[str, Any]],
+    current_timeout_seconds: float = FALLBACK_TIMEOUT_SECONDS,
+) -> tuple[float, str]:
+    """Return an upward-only bounded timeout from normalized Nav2 feedback."""
+    effective = min(MAX_TIMEOUT_SECONDS, max(FALLBACK_TIMEOUT_SECONDS, current_timeout_seconds))
+    basis = "fallback"
+    for item in feedback:
+        eta = item.get("estimated_time_remaining_seconds")
+        distance = item.get("distance_remaining")
+        if isinstance(eta, (int, float)) and not isinstance(eta, bool) and math.isfinite(eta) and eta > 0:
+            candidate, candidate_basis = eta * 1.5 + 15.0, "estimated_time_remaining"
+        elif isinstance(distance, (int, float)) and not isinstance(distance, bool) and math.isfinite(distance) and distance > 0:
+            candidate, candidate_basis = distance / DISTANCE_FALLBACK_SPEED_MPS * 1.5 + 15.0, "distance_remaining"
+        else:
+            continue
+        candidate = min(MAX_TIMEOUT_SECONDS, max(FALLBACK_TIMEOUT_SECONDS, candidate))
+        if candidate > effective:
+            effective, basis = candidate, candidate_basis
+    return effective, basis
 
 
 class NavigationExecutor(ABC):
@@ -47,7 +76,7 @@ class NavigationExecutor(ABC):
     def send_goal(self, goal: NavigationGoal) -> object: ...
 
     @abstractmethod
-    def wait_for_result(self, handle: object, timeout_seconds: float) -> NavigationOutcome: ...
+    def wait_for_result(self, handle: object, timeout_seconds: float | None) -> NavigationOutcome: ...
 
     @abstractmethod
     def cancel_goal(self, handle: object) -> None: ...
@@ -65,8 +94,8 @@ class FakeNavigationExecutor(NavigationExecutor):
         self.sent_goals.append(goal)
         return len(self.sent_goals)
 
-    def wait_for_result(self, handle: object, timeout_seconds: float) -> NavigationOutcome:
-        if timeout_seconds <= 0:
+    def wait_for_result(self, handle: object, timeout_seconds: float | None) -> NavigationOutcome:
+        if timeout_seconds is not None and timeout_seconds <= 0:
             return NavigationOutcome("timed_out", reason="timeout_exceeded")
         return self.outcomes.pop(0) if self.outcomes else NavigationOutcome("succeeded")
 
@@ -132,19 +161,30 @@ class Nav2SimulationExecutor(NavigationExecutor):
         self._feedback_by_handle[id(handle)] = feedback
         return handle
 
-    def wait_for_result(self, handle: object, timeout_seconds: float) -> NavigationOutcome:
+    def wait_for_result(self, handle: object, timeout_seconds: float | None) -> NavigationOutcome:
         future = handle.get_result_async()
         import rclpy
-        rclpy.spin_until_future_complete(self._node, future, timeout_sec=timeout_seconds)
+        feedback_list = self._feedback_by_handle.get(id(handle), [])
+        if timeout_seconds is None:
+            effective_timeout, basis = FALLBACK_TIMEOUT_SECONDS, "fallback"
+            started = time.monotonic()
+            while not future.done():
+                rclpy.spin_until_future_complete(self._node, future, timeout_sec=min(1.0, effective_timeout))
+                effective_timeout, basis = adaptive_timeout_from_feedback(feedback_list, effective_timeout)
+                if time.monotonic() - started >= effective_timeout:
+                    break
+        else:
+            effective_timeout, basis = timeout_seconds, "user"
+            rclpy.spin_until_future_complete(self._node, future, timeout_sec=timeout_seconds)
         feedback = tuple(self._feedback_by_handle.pop(id(handle), ()))
         if not future.done():
             self.cancel_goal(handle)
-            return NavigationOutcome("timed_out", feedback, "timeout_exceeded")
+            return NavigationOutcome("timed_out", feedback, "timeout_exceeded", effective_timeout, basis)
         result = future.result()
         status = int(result.status)
         # action_msgs/GoalStatus values: succeeded=4, canceled=5; all other
         # terminal statuses are fail-closed as failed.
-        return NavigationOutcome("succeeded" if status == 4 else "cancelled" if status == 5 else "failed", feedback)
+        return NavigationOutcome("succeeded" if status == 4 else "cancelled" if status == 5 else "failed", feedback, None, effective_timeout, basis)
 
     def cancel_goal(self, handle: object) -> None:
         handle.cancel_goal_async()

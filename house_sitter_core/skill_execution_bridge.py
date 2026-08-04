@@ -4,13 +4,14 @@ from __future__ import annotations
 
 import copy
 import json
+import math
 import os
 import tempfile
 from pathlib import Path
 from typing import Any
 
 from .home_simulation_state import HomeSimulationState
-from .nav2_sim_bridge import NavigationError, NavigationExecutor, NavigationGoal
+from .nav2_sim_bridge import FALLBACK_TIMEOUT_SECONDS, NavigationError, NavigationExecutor, NavigationGoal, adaptive_timeout_from_feedback
 from .skill_planner import SkillRequest
 from .skill_runtime import _apply_success_state
 
@@ -46,12 +47,12 @@ def _flags() -> dict[str, Any]:
 
 def execute_skill_in_simulation(
     plan: dict[str, Any], request: SkillRequest, executor: NavigationExecutor | None,
-    *, timeout_seconds: float = 30.0, dry_run: bool = False,
+    *, timeout_seconds: float | None = None, dry_run: bool = False,
     state: HomeSimulationState | None = None,
 ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
     """Execute only navigation through the injected Nav2 interface; never use hardware APIs."""
-    if timeout_seconds <= 0:
-        raise SkillExecutionBridgeError("timeout_seconds must be positive.")
+    if timeout_seconds is not None and (not math.isfinite(timeout_seconds) or timeout_seconds <= 0):
+        raise SkillExecutionBridgeError("timeout_seconds must be a finite positive number.")
     if plan.get("request_id") != request.request_id or plan.get("skill_name") != request.skill_name:
         raise SkillExecutionBridgeError("plan and request identity mismatch.")
     if plan.get("simulation_only") is not True or plan.get("review_only") is not True or plan.get("executable") is not False:
@@ -68,6 +69,9 @@ def execute_skill_in_simulation(
     overall_status = "succeeded"
     checkpoint: dict[str, Any] | None = None
     controls = request.injected_events
+    timeout_policy = "explicit" if timeout_seconds is not None else "adaptive"
+    effective_timeout_seconds = timeout_seconds if timeout_seconds is not None else FALLBACK_TIMEOUT_SECONDS
+    timeout_basis = "user" if timeout_seconds is not None else "fallback"
 
     def emit(step: dict[str, Any], status: str, reason: str | None = None, feedback: dict[str, Any] | None = None) -> None:
         nonlocal next_event
@@ -101,6 +105,12 @@ def execute_skill_in_simulation(
                 outcome_status, outcome_reason, feedback = "failed", str(exc), ()
             else:
                 outcome_status, outcome_reason, feedback = outcome.status, outcome.reason, outcome.feedback
+                if timeout_seconds is None:
+                    effective_timeout_seconds, timeout_basis = (
+                        (outcome.effective_timeout_seconds, outcome.timeout_basis)
+                        if outcome.effective_timeout_seconds is not None and outcome.timeout_basis is not None
+                        else adaptive_timeout_from_feedback(feedback, effective_timeout_seconds)
+                    )
             for item in feedback:
                 emit(step, "feedback", feedback=item)
             if outcome_status != "succeeded":
@@ -121,13 +131,14 @@ def execute_skill_in_simulation(
     result = {"schema_version": "1.0", "request_id": request.request_id, "skill_name": request.skill_name,
               "execution_mode": "dry_run" if dry_run else "gazebo_nav2_simulation", "overall_status": overall_status,
               "terminal_reason": terminal_reason, "steps": steps, "total_steps": len(steps), **{f"{key}_steps": value for key, value in counts.items()},
-              "checkpoint": checkpoint, "state": simulation_state.snapshot(), **_flags()}
+              "checkpoint": checkpoint, "state": simulation_state.snapshot(), "timeout_policy": timeout_policy,
+              "effective_timeout_seconds": effective_timeout_seconds, "timeout_basis": timeout_basis, **_flags()}
     return result, events
 
 
 def render_execution_artifacts(request: SkillRequest, plan: dict[str, Any], result: dict[str, Any], events: list[dict[str, Any]]) -> dict[str, str]:
     execution_plan = {"skill_plan": plan, "navigation_interface": "NavigateToPose", "frame_id": "map", **_flags()}
-    report = "# Gazebo Nav2 Simulation Execution\n\nSIMULATION ONLY\n\nThis project is simulation-only and does not support real-robot deployment.\n"
+    report = "# Gazebo Nav2 Simulation Execution\n\nSIMULATION ONLY\n\nThis project is simulation-only and does not support real-robot deployment.\n\n## Timeout\n\n" + f"- Policy: `{result['timeout_policy']}`\n- Effective timeout: `{result['effective_timeout_seconds']}` seconds\n- Basis: `{result['timeout_basis']}`\n"
     return {
         "execution_request.json": json.dumps({**request.as_dict(), **_flags()}, indent=2, sort_keys=True) + "\n",
         "execution_plan.json": json.dumps(execution_plan, indent=2, sort_keys=True) + "\n",

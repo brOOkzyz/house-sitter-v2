@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import sys
 from pathlib import Path
 from typing import Any
@@ -40,7 +41,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Simulation-only Gazebo/Nav2 skill bridge; never supports a real robot.")
     parser.add_argument("--skill", required=True); parser.add_argument("--semantic-regions", required=True, type=Path)
     parser.add_argument("--safe-goals", required=True, type=Path); parser.add_argument("--param", action="append", default=[])
-    parser.add_argument("--output-dir", required=True, type=Path); parser.add_argument("--timeout-seconds", type=float, default=30.0)
+    parser.add_argument("--output-dir", required=True, type=Path); parser.add_argument("--timeout-seconds", type=float)
     mode = parser.add_mutually_exclusive_group(); mode.add_argument("--dry-run", action="store_true"); mode.add_argument("--execute-simulation", action="store_true")
     return parser.parse_args(argv)
 
@@ -48,6 +49,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
     try:
+        if args.timeout_seconds is not None and (not math.isfinite(args.timeout_seconds) or args.timeout_seconds <= 0):
+            raise ValueError("timeout-seconds must be a finite positive number.")
         parameters = _assignments(args.param)
         request = create_skill_request(args.skill, parameters)
         regions, goals = load_skill_inputs(args.semantic_regions, args.safe_goals)
