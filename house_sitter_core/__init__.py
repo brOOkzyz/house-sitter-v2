@@ -23,7 +23,11 @@ from .semantic_waypoints import (
     resolve_semantic_label,
     semantic_label_exists,
 )
-from .sim_execution_request import build_sim_nav2_execution_request
+from .sim_execution_request import (
+    ExecutionRequestBuildResult,
+    build_sim_nav2_execution_request,
+    build_sim_nav2_execution_requests,
+)
 from .verifier import PlanVerificationError, PlanVerifier
 
 __all__ = [
@@ -45,7 +49,9 @@ __all__ = [
     "semantic_label_exists",
 
     "PlanVerifier",
+    "ExecutionRequestBuildResult",
     "build_sim_nav2_execution_request",
+    "build_sim_nav2_execution_requests",
     "provider_from_env",
     "WaypointConfigError",
     "WaypointStore",

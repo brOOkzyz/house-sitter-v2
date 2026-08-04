@@ -5,6 +5,7 @@ import json
 import sys
 import unittest
 from pathlib import Path
+from unittest import mock
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
@@ -12,6 +13,7 @@ sys.path.insert(0, str(PROJECT_ROOT / "scripts"))
 
 from house_sitter_core.llm_provider import MockPlannerProvider  # noqa: E402
 from house_sitter_core.schemas import make_plan  # noqa: E402
+from house_sitter_core.verifier import PlanVerifier  # noqa: E402
 from run_llm_demo import parse_args, run_demo  # noqa: E402
 
 
@@ -33,6 +35,74 @@ class RecordingExecutor:
 
 
 class LLMDemoTests(unittest.TestCase):
+    @staticmethod
+    def verifier():
+        return PlanVerifier(
+            PROJECT_ROOT / "config" / "allowed_actions.json",
+            PROJECT_ROOT / "config" / "waypoints.json",
+        )
+
+    def test_multi_step_demo_verifies_and_grounds_each_step_once(self):
+        plan = make_plan(
+            "alias_route",
+            "mock_planner",
+            [
+                {"action": "navigate_to_waypoint", "parameters": {"waypoint": "corridor"}},
+                {
+                    "action": "navigate_to_waypoint",
+                    "parameters": {"waypoint": "charging station"},
+                },
+            ],
+        )
+        verifier = self.verifier()
+        stream = io.StringIO()
+        with mock.patch.object(
+            verifier, "verify_with_grounding", wraps=verifier.verify_with_grounding
+        ) as verify, mock.patch.object(
+            verifier.semantic_waypoints,
+            "resolve",
+            wraps=verifier.semantic_waypoints.resolve,
+        ) as resolve:
+            exit_code = run_demo(
+                "go through the corridor, then return to the charging station",
+                provider=StaticProvider(json.dumps(plan)),
+                verifier=verifier,
+                executor=RecordingExecutor(),
+                stream=stream,
+            )
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(verify.call_count, 1)
+        self.assertEqual(resolve.call_count, 2)
+        self.assertIn("execution request count: 2", stream.getvalue())
+
+    def test_failed_multi_step_demo_verifies_once_and_builds_no_requests(self):
+        plan = make_plan(
+            "rejected_route",
+            "mock_planner",
+            [
+                {"action": "navigate_to_waypoint", "parameters": {"waypoint": "hallway"}},
+                {"action": "navigate_to_waypoint", "parameters": {"waypoint": "kitchen"}},
+                {"action": "navigate_to_waypoint", "parameters": {"waypoint": "balcony"}},
+            ],
+        )
+        verifier = self.verifier()
+        stream = io.StringIO()
+        executor = RecordingExecutor()
+        with mock.patch.object(
+            verifier, "verify_with_grounding", wraps=verifier.verify_with_grounding
+        ) as verify:
+            exit_code = run_demo(
+                "hallway then kitchen then balcony",
+                provider=StaticProvider(json.dumps(plan)),
+                verifier=verifier,
+                executor=executor,
+                stream=stream,
+            )
+        self.assertEqual(exit_code, 1)
+        self.assertEqual(verify.call_count, 1)
+        self.assertEqual(executor.plans, [])
+        self.assertIn("execution request count: 0", stream.getvalue())
+
     def test_defaults_to_mock_provider_flow(self):
         args = parse_args(["patrol the living room and return to start"])
         self.assertEqual(args.command, "patrol the living room and return to start")

@@ -64,8 +64,8 @@ class SemanticWaypointRegistry:
         *,
         expression: str,
         canonical_label: str,
-        alias_lookup: Dict[str, Dict[str, str]],
-        matched_alias: str,
+        alias_lookup: Dict[str, Dict[str, Optional[str]]],
+        matched_alias: Optional[str],
     ) -> None:
         normalized = cls._normalize_expression(expression)
         existing = alias_lookup.get(normalized)
@@ -82,7 +82,7 @@ class SemanticWaypointRegistry:
     @classmethod
     def _validate_config(
         cls, config: Dict[str, Any]
-    ) -> tuple[Dict[str, Dict[str, Any]], Dict[str, Dict[str, str]]]:
+    ) -> tuple[Dict[str, Dict[str, Any]], Dict[str, Dict[str, Optional[str]]]]:
         if config.get("schema_version") != "1.0":
             raise SemanticWaypointError("Unsupported semantic waypoint schema_version.")
         if config.get("simulation_only") is not True:
@@ -93,7 +93,7 @@ class SemanticWaypointRegistry:
             raise SemanticWaypointError("Semantic waypoint registry labels must be non-empty.")
 
         validated: Dict[str, Dict[str, Any]] = {}
-        alias_lookup: Dict[str, Dict[str, str]] = {}
+        alias_lookup: Dict[str, Dict[str, Optional[str]]] = {}
         for key, entry in labels.items():
             if not isinstance(key, str) or not key.strip():
                 raise SemanticWaypointError("Semantic waypoint label keys must be strings.")
@@ -137,7 +137,7 @@ class SemanticWaypointRegistry:
                 expression=key,
                 canonical_label=key,
                 alias_lookup=alias_lookup,
-                matched_alias=key,
+                matched_alias=None,
             )
             validated_aliases: list[str] = []
             for alias in aliases:
@@ -177,7 +177,7 @@ class SemanticWaypointRegistry:
     def match_prompt_expression(self, prompt: str) -> Optional[str]:
         normalized_prompt = self._normalize_expression(prompt)
         matches = [
-            data["matched_alias"]
+            data["matched_alias"] or data["canonical_label"]
             for expression, data in self.alias_lookup.items()
             if f" {expression} " in f" {normalized_prompt} "
         ]

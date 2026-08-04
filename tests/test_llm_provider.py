@@ -179,7 +179,7 @@ class LLMProviderTests(unittest.TestCase):
         )
         provider = GeminiPlannerProvider(api_key="test-key", client=FakeClient(response))
         verified = VerifiedPlannerAdapter(provider, self.verifier).generate("visit hallway")
-        request = build_sim_nav2_execution_request(verified)
+        request = build_sim_nav2_execution_request(verified, verifier=self.verifier)
         self.assertTrue(request["requires_navigation"])
         self.assertEqual(request["script"], "scripts/run_sim_nav2_micro_smoke.py")
         self.assertFalse(request["uses_llm_coordinates"])

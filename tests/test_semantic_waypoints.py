@@ -141,12 +141,11 @@ class SemanticWaypointTests(unittest.TestCase):
             "gemini_planner",
             [{"action": "navigate_to_waypoint", "parameters": {"waypoint": "corridor"}}],
         )
-        verified = self.verifier.verify(plan)
-        request = build_sim_nav2_execution_request(verified)
+        request = build_sim_nav2_execution_request(plan, verifier=self.verifier)
         self.assertEqual(request["semantic_grounding"], "user_labelled_registry")
         self.assertFalse(request["uses_llm_coordinates"])
         self.assertEqual(request["navigation_intents"][0]["semantic_label"], "hallway")
-        self.assertEqual(request["navigation_intents"][0]["matched_alias"], "hallway")
+        self.assertEqual(request["navigation_intents"][0]["matched_alias"], "corridor")
         self.assertEqual(request["navigation_intents"][0]["canonical_label"], "hallway")
         self.assertEqual(
             request["navigation_intents"][0]["grounding_mode"],
@@ -239,11 +238,7 @@ class SemanticWaypointTests(unittest.TestCase):
                 "gemini_planner",
                 [{"action": "navigate_to_waypoint", "parameters": {"waypoint": "corridor"}}],
             )
-            verified = verifier.verify(plan)
-            request = build_sim_nav2_execution_request(
-                verified,
-                semantic_resolver=verifier.semantic_waypoints.resolve,
-            )
+            request = build_sim_nav2_execution_request(plan, verifier=verifier)
             self.assertEqual(
                 request["navigation_intents"][0]["description"],
                 "Custom hallway registry for verifier test.",

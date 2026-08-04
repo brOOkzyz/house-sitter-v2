@@ -1,7 +1,7 @@
 {
   "schema_version": "1.0",
   "limits": {
-    "max_steps": 12
+    "max_steps": 5
   },
   "actions": {
     "navigate_to_waypoint": {
@@ -9,27 +9,6 @@
       "required_parameters": ["waypoint"],
       "parameters": {
         "waypoint": {"type": "string", "source": "semantic_waypoints"}
-      }
-    },
-    "rotate": {
-      "description": "Rotate in place by a bounded angle in degrees.",
-      "required_parameters": ["angle_degrees"],
-      "parameters": {
-        "angle_degrees": {"type": "number", "minimum": -180.0, "maximum": 180.0}
-      }
-    },
-    "wait": {
-      "description": "Wait for a bounded duration.",
-      "required_parameters": ["duration_seconds"],
-      "parameters": {
-        "duration_seconds": {"type": "number", "minimum": 0.0, "maximum": 30.0}
-      }
-    },
-    "report_status": {
-      "description": "Record a status-report step without robot motion.",
-      "required_parameters": ["detail"],
-      "parameters": {
-        "detail": {"type": "string", "allowed_values": ["brief", "full"]}
       }
     }
   }

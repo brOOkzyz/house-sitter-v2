@@ -21,24 +21,12 @@ sys.path.insert(0, str(PROJECT_ROOT))
 from house_sitter_core.llm_provider import (  # noqa: E402
     PlannerProvider,
     PlannerProviderError,
-    VerifiedPlannerAdapter,
     provider_from_env,
 )
 from house_sitter_core.sim_execution_request import (  # noqa: E402
-    build_sim_nav2_execution_request,
+    build_sim_nav2_execution_requests,
 )
-from house_sitter_core.semantic_waypoints import resolve_semantic_label  # noqa: E402
 from house_sitter_core.verifier import PlanVerificationError, PlanVerifier  # noqa: E402
-
-
-class _StaticJsonProvider(PlannerProvider):
-    """Adapter helper that replays one JSON string through the verifier."""
-
-    def __init__(self, raw_json: str) -> None:
-        self._raw_json = raw_json
-
-    def generate_json(self, prompt: str) -> str:
-        return self._raw_json
 
 
 def build_verifier() -> PlanVerifier:
@@ -66,16 +54,14 @@ def _print_semantic_grounding_summary(
     if not raw_labels or not verified_labels or not request["navigation_intents"]:
         return
 
-    original_label = raw_labels[0]
     canonical_label = verified_labels[0]
-    resolved = resolve_semantic_label(original_label)
     intent = request["navigation_intents"][0]
     source = verified_plan["source"]
 
     matched_alias_display = (
         "none (canonical input)"
-        if resolved["matched_alias"] == resolved["canonical_label"]
-        else resolved["matched_alias"]
+        if intent["matched_alias"] is None
+        else intent["matched_alias"]
     )
 
     print("\n=== Semantic grounding summary ===")
@@ -84,9 +70,9 @@ def _print_semantic_grounding_summary(
         print("Gemini SDK produced the structured intent.")
     else:
         print(f"Planner source '{source}' produced the structured intent.")
-    print(f"original semantic input: {resolved['original_input']}")
+    print(f"original semantic input: {intent['original_input']}")
     print(f"matched alias: {matched_alias_display}")
-    print(f"canonical semantic label: {resolved['canonical_label']}")
+    print(f"canonical semantic label: {intent['canonical_label']}")
     print(f"registry grounding result: {intent['canonical_label']}")
     print(f"execution target: {json.dumps(intent['execution_target'])}")
     print("simulation-only: yes")
@@ -94,7 +80,7 @@ def _print_semantic_grounding_summary(
     print("direct /cmd_vel used: no")
     print("semantic grounding was resolved by the registry.")
     print("Gemini did not provide coordinates.")
-    print(f"grounding_mode: {resolved['grounding_mode']}")
+    print(f"grounding_mode: {intent['grounding_mode']}")
     print(f"request canonical label: {canonical_label}")
 
 
@@ -115,15 +101,16 @@ def run_demo(
         verifier = verifier or build_verifier()
         raw_json = provider.generate_json(command)
         raw_plan = json.loads(raw_json)
-        adapter = VerifiedPlannerAdapter(_StaticJsonProvider(raw_json), verifier)
-        verified_plan = adapter.generate(command)
-        request = build_sim_nav2_execution_request(
-            verified_plan,
-            semantic_resolver=verifier.semantic_waypoints.resolve,
-        )
+        result = build_sim_nav2_execution_requests(raw_plan, verifier=verifier)
+        verified_plan = result.verified_plan
+        request = result.to_aggregate_request()
     except (PlannerProviderError, PlanVerificationError, ValueError) as exc:
         print("\n=== Rejected request ===")
         print(f"Error: {exc}")
+        print("execution request count: 0")
+        print("navigation execution started: no")
+        print("direct /cmd_vel used: no")
+        print("/navigate_to_pose sent: no")
         return 1
 
     print("\n=== Verified JSON plan ===")

@@ -7,8 +7,10 @@ import json
 import sys
 import unittest
 from pathlib import Path
+from unittest import mock
 
 from house_sitter_core.schemas import make_plan
+from house_sitter_core.verifier import PlanVerifier
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -141,7 +143,43 @@ class LLMSimNav2DemoTests(unittest.TestCase):
         self.assertEqual(exit_code, 1)
         self.assertIn("Rejected request", output)
         self.assertIn("unknown semantic waypoint", output)
+        self.assertIn("execution request count: 0", output)
         self.assertNotIn("=== Simulation execution request ===", output)
+
+    def test_demo_verifies_and_grounds_aliases_once(self):
+        plan = make_plan(
+            "alias_route",
+            "mock_planner",
+            [
+                {"action": "navigate_to_waypoint", "parameters": {"waypoint": "corridor"}},
+                {
+                    "action": "navigate_to_waypoint",
+                    "parameters": {"waypoint": "charging station"},
+                },
+            ],
+        )
+        verifier = PlanVerifier(
+            PROJECT_ROOT / "config" / "allowed_actions.json",
+            PROJECT_ROOT / "config" / "waypoints.json",
+        )
+        stream = io.StringIO()
+        with mock.patch.object(
+            verifier, "verify_with_grounding", wraps=verifier.verify_with_grounding
+        ) as verify, mock.patch.object(
+            verifier.semantic_waypoints,
+            "resolve",
+            wraps=verifier.semantic_waypoints.resolve,
+        ) as resolve, contextlib.redirect_stdout(stream):
+            exit_code = self.demo.run_demo(
+                "go through the corridor, then return to the charging station",
+                execute_sim=False,
+                provider=StaticProvider(json.dumps(plan)),
+                verifier=verifier,
+            )
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(verify.call_count, 1)
+        self.assertEqual(resolve.call_count, 2)
+        self.assertIn('"execution_request_count": 2', stream.getvalue())
 
 
 if __name__ == "__main__":

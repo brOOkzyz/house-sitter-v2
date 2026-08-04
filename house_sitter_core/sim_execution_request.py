@@ -1,56 +1,95 @@
-"""Pure simulation execution request builder for verified LLM plans."""
+"""Pure simulation execution request builders for fully verified plans."""
 
 from __future__ import annotations
 
-from typing import Any, Callable, Dict, Optional
+from dataclasses import dataclass
+from typing import Any, Dict
 
 from .schemas import TaskPlan
-from .semantic_waypoints import resolve_semantic_label
+from .verifier import PlanVerifier
+
+
+@dataclass(frozen=True)
+class ExecutionRequestBuildResult:
+    """One mandatory verification result and its atomically-built requests."""
+
+    verified_plan: TaskPlan
+    grounded_steps: list[Dict[str, Any]]
+    execution_requests: list[Dict[str, Any]]
+
+    def to_aggregate_request(self) -> Dict[str, Any]:
+        """Present this already-verified bundle through the legacy aggregate shape."""
+
+        navigation_intents = [
+            {
+                "semantic_label": request["canonical_label"],
+                "original_input": request["original_input"],
+                "matched_alias": request["matched_alias"],
+                "canonical_label": request["canonical_label"],
+                "description": request["description"],
+                "grounding_mode": request["grounding_mode"],
+                "execution_target": request["execution_target"],
+                "gemini_provided_coordinates": False,
+            }
+            for request in self.execution_requests
+        ]
+        return {
+            "mode": "simulation_only_nav2_micro_smoke",
+            "script": "scripts/run_sim_nav2_micro_smoke.py",
+            "requires_navigation": bool(self.execution_requests),
+            "navigation_intents": navigation_intents,
+            "execution_requests": self.execution_requests,
+            "execution_request_count": len(self.execution_requests),
+            "uses_llm_coordinates": False,
+            "uses_direct_cmd_vel": False,
+            "requires_verifier": True,
+            "semantic_grounding": "user_labelled_registry",
+        }
+
+
+def build_sim_nav2_execution_requests(
+    plan: TaskPlan,
+    *,
+    verifier: PlanVerifier,
+) -> ExecutionRequestBuildResult:
+    """Verify the full candidate plan, then atomically build execution requests."""
+
+    verified = verifier.verify_with_grounding(plan)
+    snapshots = verified.grounding_snapshots
+    if len(snapshots) != len(verified.plan["steps"]):
+        raise ValueError("Every execution step must have a verifier grounding snapshot.")
+
+    requests = [
+        {
+            "step_index": index,
+            "mode": "simulation_only_nav2_micro_smoke",
+            "action": "navigate_to_waypoint",
+            "parameters": {"waypoint": snapshot["canonical_label"]},
+            "semantic_label": snapshot["canonical_label"],
+            "original_input": snapshot["original_input"],
+            "matched_alias": snapshot["matched_alias"],
+            "canonical_label": snapshot["canonical_label"],
+            "description": snapshot["description"],
+            "grounding_mode": snapshot["grounding_mode"],
+            "execution_target": snapshot["execution_target"],
+            "verification_result": snapshot["verification_result"],
+            "uses_llm_coordinates": False,
+            "uses_direct_cmd_vel": False,
+        }
+        for index, snapshot in enumerate(snapshots, start=1)
+    ]
+    return ExecutionRequestBuildResult(
+        verified_plan=verified.plan,
+        grounded_steps=snapshots,
+        execution_requests=requests,
+    )
 
 
 def build_sim_nav2_execution_request(
-    verified_plan: TaskPlan,
+    plan: TaskPlan,
     *,
-    semantic_resolver: Optional[Callable[[str], Dict[str, Any]]] = None,
+    verifier: PlanVerifier,
 ) -> Dict[str, Any]:
-    """Map a verified plan to a simulation-only execution request.
+    """Backward-compatible aggregate around the atomic per-step requests."""
 
-    Named waypoints from the LLM are treated only as semantic intent. Labels
-    must already exist in the user-labelled semantic registry. Navigation is
-    delegated to the micro-smoke safety layer, which derives a nearby free-space
-    candidate from live localization and map data.
-    """
-
-    resolver = semantic_resolver or resolve_semantic_label
-    navigation_steps = [
-        step
-        for step in verified_plan["steps"]
-        if step["action"] == "navigate_to_waypoint"
-    ]
-    navigation_intents = []
-    for step in navigation_steps:
-        label = step["parameters"]["waypoint"]
-        resolved = resolver(label)
-        navigation_intents.append(
-            {
-                "semantic_label": label,
-                "original_input": resolved["original_input"],
-                "matched_alias": resolved["matched_alias"],
-                "canonical_label": resolved["canonical_label"],
-                "description": resolved["description"],
-                "grounding_mode": resolved["grounding_mode"],
-                "execution_target": resolved["execution_target"],
-                "gemini_provided_coordinates": False,
-            }
-        )
-
-    return {
-        "mode": "simulation_only_nav2_micro_smoke",
-        "script": "scripts/run_sim_nav2_micro_smoke.py",
-        "requires_navigation": bool(navigation_steps),
-        "navigation_intents": navigation_intents,
-        "uses_llm_coordinates": False,
-        "uses_direct_cmd_vel": False,
-        "requires_verifier": True,
-        "semantic_grounding": "user_labelled_registry",
-    }
+    return build_sim_nav2_execution_requests(plan, verifier=verifier).to_aggregate_request()

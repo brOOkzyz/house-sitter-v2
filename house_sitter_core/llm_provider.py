@@ -14,13 +14,15 @@ from .schemas import SCHEMA_VERSION, TaskPlan
 from .verifier import PlanVerifier
 
 
-ALLOWED_ACTIONS = {
-    "navigate_to_waypoint",
-    "rotate",
-    "wait",
-    "report_status",
-}
-FORBIDDEN_COORDINATE_KEYS = frozenset({"x", "y", "yaw", "pose", "coordinates"})
+ALLOWED_ACTIONS = {"navigate_to_waypoint"}
+MAX_PLAN_STEPS = 5
+FORBIDDEN_COORDINATE_KEYS = frozenset(
+    {
+        "x", "y", "yaw", "pose", "position", "orientation", "quaternion",
+        "coordinates", "cmd_vel", "linear_velocity", "angular_velocity",
+        "ros_topic", "ros_action_name", "frame_id",
+    }
+)
 GEMINI_PLAN_JSON_SCHEMA: Dict[str, Any] = {
     "type": "object",
     "additionalProperties": False,
@@ -32,82 +34,22 @@ GEMINI_PLAN_JSON_SCHEMA: Dict[str, Any] = {
         "steps": {
             "type": "array",
             "minItems": 1,
+            "maxItems": MAX_PLAN_STEPS,
             "items": {
-                "oneOf": [
-                    {
+                "type": "object",
+                "additionalProperties": False,
+                "required": ["action", "parameters"],
+                "properties": {
+                    "action": {"type": "string", "enum": ["navigate_to_waypoint"]},
+                    "parameters": {
                         "type": "object",
                         "additionalProperties": False,
-                        "required": ["action", "parameters"],
+                        "required": ["waypoint"],
                         "properties": {
-                            "action": {
-                                "type": "string",
-                                "enum": ["navigate_to_waypoint"],
-                            },
-                            "parameters": {
-                                "type": "object",
-                                "additionalProperties": False,
-                                "required": ["waypoint"],
-                                "properties": {
-                                    "waypoint": {"type": "string", "minLength": 1}
-                                },
-                            },
+                            "waypoint": {"type": "string", "minLength": 1}
                         },
                     },
-                    {
-                        "type": "object",
-                        "additionalProperties": False,
-                        "required": ["action", "parameters"],
-                        "properties": {
-                            "action": {"type": "string", "enum": ["rotate"]},
-                            "parameters": {
-                                "type": "object",
-                                "additionalProperties": False,
-                                "required": ["angle_degrees"],
-                                "properties": {
-                                    "angle_degrees": {"type": "number"}
-                                },
-                            },
-                        },
-                    },
-                    {
-                        "type": "object",
-                        "additionalProperties": False,
-                        "required": ["action", "parameters"],
-                        "properties": {
-                            "action": {"type": "string", "enum": ["wait"]},
-                            "parameters": {
-                                "type": "object",
-                                "additionalProperties": False,
-                                "required": ["duration_seconds"],
-                                "properties": {
-                                    "duration_seconds": {"type": "number"}
-                                },
-                            },
-                        },
-                    },
-                    {
-                        "type": "object",
-                        "additionalProperties": False,
-                        "required": ["action", "parameters"],
-                        "properties": {
-                            "action": {
-                                "type": "string",
-                                "enum": ["report_status"],
-                            },
-                            "parameters": {
-                                "type": "object",
-                                "additionalProperties": False,
-                                "required": ["detail"],
-                                "properties": {
-                                    "detail": {
-                                        "type": "string",
-                                        "enum": ["brief", "full"],
-                                    }
-                                },
-                            },
-                        },
-                    },
-                ]
+                },
             },
         },
     },
@@ -151,21 +93,15 @@ def _load_google_genai_sdk() -> Any:
 def _reject_coordinate_like_fields(value: Any, *, path: str = "plan") -> None:
     if isinstance(value, dict):
         for key, nested in value.items():
-            if key in FORBIDDEN_COORDINATE_KEYS:
+            normalized_key = str(key).strip().lower().replace("-", "_").replace(" ", "_")
+            if normalized_key in FORBIDDEN_COORDINATE_KEYS:
                 raise PlannerProviderError(
                     f"Gemini structured output must not contain coordinate-like field: {path}.{key}"
                 )
             _reject_coordinate_like_fields(nested, path=f"{path}.{key}")
     elif isinstance(value, list):
-        for index, nested in enumerate(value):
-            _reject_coordinate_like_fields(nested, path=f"{path}[{index}]")
-
-
-def _validate_number(value: Any, *, field_name: str) -> None:
-    if isinstance(value, bool) or not isinstance(value, (int, float)):
-        raise PlannerProviderError(
-            f"Gemini structured output field {field_name} must be numeric."
-        )
+        for index, nested in enumerate(value, start=1):
+            _reject_coordinate_like_fields(nested, path=f"{path} Step {index}")
 
 
 def _validate_gemini_structured_plan(plan: Dict[str, Any]) -> Dict[str, Any]:
@@ -186,14 +122,14 @@ def _validate_gemini_structured_plan(plan: Dict[str, Any]) -> Dict[str, Any]:
         )
 
     steps = plan.get("steps")
-    if not isinstance(steps, list) or not steps:
+    if not isinstance(steps, list) or not 1 <= len(steps) <= MAX_PLAN_STEPS:
         raise PlannerProviderError(
-            "Gemini structured output steps must be a non-empty list."
+            f"Gemini structured output steps must contain between 1 and {MAX_PLAN_STEPS} items."
         )
 
     _reject_coordinate_like_fields(plan)
 
-    for index, step in enumerate(steps):
+    for index, step in enumerate(steps, start=1):
         if not isinstance(step, dict) or set(step) != {"action", "parameters"}:
             raise PlannerProviderError(
                 f"Gemini structured output step {index} must contain only action and parameters."
@@ -216,33 +152,6 @@ def _validate_gemini_structured_plan(plan: Dict[str, Any]) -> Dict[str, Any]:
             if not isinstance(parameters["waypoint"], str) or not parameters["waypoint"].strip():
                 raise PlannerProviderError(
                     f"Gemini structured output step {index} waypoint must be a non-empty string label."
-                )
-        elif action == "rotate":
-            if set(parameters) != {"angle_degrees"}:
-                raise PlannerProviderError(
-                    f"Gemini structured output step {index} rotate parameters must be exactly ['angle_degrees']."
-                )
-            _validate_number(
-                parameters["angle_degrees"],
-                field_name=f"steps[{index}].parameters.angle_degrees",
-            )
-        elif action == "wait":
-            if set(parameters) != {"duration_seconds"}:
-                raise PlannerProviderError(
-                    f"Gemini structured output step {index} wait parameters must be exactly ['duration_seconds']."
-                )
-            _validate_number(
-                parameters["duration_seconds"],
-                field_name=f"steps[{index}].parameters.duration_seconds",
-            )
-        elif action == "report_status":
-            if set(parameters) != {"detail"}:
-                raise PlannerProviderError(
-                    f"Gemini structured output step {index} report_status parameters must be exactly ['detail']."
-                )
-            if parameters["detail"] not in {"brief", "full"}:
-                raise PlannerProviderError(
-                    f"Gemini structured output step {index} detail must be 'brief' or 'full'."
                 )
 
     return plan
@@ -277,18 +186,22 @@ class MockPlannerProvider(PlannerProvider):
 
 
 def build_structured_planner_prompt(user_prompt: str) -> str:
-    """Constrain Gemini to the current allow-listed structured plan schema."""
+    """Constrain Gemini to ordered semantic navigation intent only."""
 
     return (
         "Return one structured task plan for a simulation-only robot workflow. "
-        "Do not include markdown, code fences, comments, or natural-language explanation.\n"
+        "Return JSON only: no markdown, comments, or explanatory text outside JSON.\n"
         f"schema_version must be {SCHEMA_VERSION!r}. source must be \"gemini_planner\".\n"
-        "Use only these actions: navigate_to_waypoint, rotate, wait, report_status.\n"
-        "For navigate_to_waypoint, waypoint must be a user-labelled semantic registry string such as "
-        "\"start\", \"hallway\", \"living_room\", \"kitchen\", \"bedroom\", \"entrance\", \"charging_area\", or \"nearby_test\".\n"
-        "Do not output x, y, yaw, pose, coordinates, cmd_vel, ROS topics, or ROS commands.\n"
-        "Gemini does not define aliases or coordinates; aliases are explicitly user-configured in the local semantic waypoint registry.\n"
-        "Gemini only outputs structured intent; semantic labels are resolved later through a user-labelled semantic waypoint/area registry.\n"
+        "Create 1 to 5 ordered steps. Every step action must be navigate_to_waypoint, "
+        "and its parameters object must contain only waypoint.\n"
+        "Each waypoint must preserve the semantic destination or alias used in the users language; "
+        "the local registry will validate and canonicalize it later.\n"
+        "Do not output x, y, yaw, pose, coordinates, cmd_vel, position, orientation, quaternion, "
+        "frame_id, linear or angular velocity, ROS topics, action names, or ROS commands.\n"
+        "Gemini does not define aliases or coordinates; aliases are explicitly user-configured "
+        "in the local user-labelled semantic waypoint/area registry.\n"
+        "Gemini only outputs structured intent; every step is grounded and verified locally "
+        "before any simulation request is created.\n"
         f"User request: {user_prompt}"
     )
 
