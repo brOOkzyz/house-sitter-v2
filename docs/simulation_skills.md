@@ -2,7 +2,7 @@
 
 ## Scope and safety boundary
 
-This layer is deterministic local review software. Every request, plan, result, and action is `simulation_only: true`, `review_only: true`, and `executable: false`.
+The base deterministic runtime and the bridge default/`--dry-run` mode are local review software: their requests, plans, results, and actions are `simulation_only: true`, `review_only: true`, and `executable: false`. The optional simulation bridge may mark an execution record executable only within Gazebo Sim; it never supports a real robot.
 
 - Synthetic semantic labels are not ground truth.
 - Accepted-goal coordinates come from existing demo artifacts; skill code does not hard-code or generate poses.
@@ -10,7 +10,7 @@ This layer is deterministic local review software. Every request, plan, result, 
 - The layer does not rerun polygon validation, rasterization, distance transforms, or final map safety assertions.
 - Validation establishes schema and internal consistency, not file-provenance authentication. Complete internally consistent imitations are outside the local review threat model.
 - Manipulation, device control, alarm/sensor checks, escort/visitor interaction, battery, charging, timing, and recovery are simulated records only.
-- No ROS, Nav2, Gazebo, RViz, `cmd_vel`, `NavigateToPose`, dock/undock, manipulator, real IoT, or real sensor command is created.
+- The base runtime and default/`--dry-run` mode require no ROS or Nav2 and send zero action goals. Only optional `--execute-simulation` may use ROS 2/Nav2 `NavigateToPose` inside Gazebo Sim; `cmd_vel`, real hardware, dock/undock, manipulator, real IoT, and real sensor commands remain unsupported.
 
 ## Architecture
 
@@ -183,5 +183,13 @@ Every preview or run publishes exactly five deterministic files into a previousl
 All five are first completed in one sibling `TemporaryDirectory` and published by one `os.replace`. Existing targets are never overwritten. Temporary cleanup uses only the standard-library cleanup method as a best effort: if cleanup fails after a write or publication failure, the original failure is retained with a diagnostic note. It intentionally makes no hostile-concurrency no-residue guarantee.
 
 ## Future adapter boundary
+
+## Optional Gazebo Sim/Nav2 execution bridge
+
+`scripts/run_skill_in_gazebo.py` is an opt-in, simulation-only bridge. It consumes the existing compiler output rather than revalidating or recreating selector, map-identity, provenance, polygon, or raster checks. Navigation steps can be sent only through a Nav2 `NavigateToPose` action in the `map` frame with `use_sim_time`; no `cmd_vel` publisher exists. The default and `--dry-run` modes are ROS-free and send no goals. `--execute-simulation` is required to connect to an existing Gazebo Sim/Nav2 system. Non-navigation steps remain deterministic local simulation records.
+
+It atomically publishes `execution_request.json`, `execution_plan.json`, `execution_events.jsonl`, `execution_result.json`, and `execution_report.md`. These retain `simulation_only: true`, `review_only: true`, and `real_robot_supported: false`; `executable: true` means only that an explicit Gazebo/Nav2 simulation action may be attempted.
+
+**This project is simulation-only and does not support real-robot deployment.**
 
 A future ROS 2 skill adapter could translate an independently reviewed subset of plans into real robot APIs only after a new authorization, current-map/costmap/footprint validation, lifecycle and cancellation design, and hardware safety review. No such adapter, message, action client, ROS package, or executable command is implemented in this phase.
