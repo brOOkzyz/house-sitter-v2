@@ -78,6 +78,12 @@ The result is expressly synthetic and not ground truth: every record is `demo_on
 
 Both sequence artifacts remain review-only, simulation-only, and non-executable. The sequencer accepts only structurally complete and internally consistent local selector artifacts: strict matching map identity, strict demo flags, and complete selector evidence are required. It does not re-run polygon/raster safety and does not provide cryptographic artifact authentication; this remains a local review-only pipeline, never navigation authorization. Deterministic demo injections support `--fail-label`, `--timeout-seconds` with repeated `--step-duration LABEL=SECONDS`, and `--cancel-before-label`; no wall-clock waiting is used. Timeout, cancel, retry, and rollback remain minimal/deferred behaviors. The CLI publishes exactly `simulation_sequence_plan.json` and `simulation_sequence_result.json` in a new Git-ignored local output directory.
 
+### Static Gazebo visualization prototype
+
+The initial 3D demo is option A: a static Gazebo Sim world with one stationary TurtleBot4, four synthetic region boundaries, and four safe-goal markers. `house_sitter_core/gazebo_static_demo.py` consumes the existing region and accepted-goal artifacts, validates their existing strict identity/evidence contract, and writes deterministic `synthetic_demo.sdf` plus `gazebo_demo_manifest.json` through `scripts/create_gazebo_static_demo.py`. For legible presentation, all source polygon and goal map coordinates receive the same uniform visualization-only scale and translation into a compact 12 m square. The manifest preserves both original and visual coordinates plus the transform; source artifacts are never changed. No pixel-coordinate conversion, Nav2 goal, or robot command is introduced. Display indices are fixed as `1 = living_room`, `2 = kitchen`, `3 = bedroom`, and `4 = charging_area`.
+
+The model is materialized from the installed ROS 2 Jazzy TurtleBot4 standard Xacro and made static after removing runtime plugins and sensors. The independent world does not use the system warehouse/depot/maze worlds and does not claim alignment with `maps/minimal_slam_map.yaml`. `scripts/run_gazebo_static_demo.sh` starts only `gz sim` after generation; it does not start ROS, Nav2, RViz, or motion control. Labels remain `demo_only`, `synthetic_semantics`, `ground_truth: false`, `review_only`, `simulation_only`, and `executable: false`; this is visual review only, not autonomous navigation.
+
 ## Completed Modules
 
 - JSON-only LLM planning with atomic one-to-five-step semantic navigation

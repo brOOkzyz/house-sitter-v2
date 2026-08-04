@@ -137,6 +137,20 @@ python3 scripts/run_simulation_sequence.py --semantic-regions REGIONS.json --saf
 
 `fail`, `timeout`, and `cancel` are simulation injections, not real robot fault detection. Timeout uses `duration > timeout`; equality succeeds. Timeout, cancel, retry, and rollback are intentionally minimal/deferred behaviors, and no real navigation command is generated.
 
+### Static Gazebo Sim visualization
+
+The first 3D visualization prototype is a separate static, simulation-only view. It reads the existing synthetic region and accepted safe-goal artifacts, materializes the installed TurtleBot4 Jazzy standard Xacro as a static model, and generates a small independent SDF world with colored region edges and goal markers. It does not use the system warehouse world, does not start ROS/Nav2/RViz, and sends no robot commands.
+
+```bash
+python3 scripts/create_gazebo_static_demo.py \
+  --semantic-regions local_annotations/demo_semantic_run_001/demo_semantic_regions.json \
+  --safe-goals local_annotations/demo_semantic_run_001/safe_goal_candidates.json \
+  --output-dir local_annotations/gazebo_static_demo_run_001
+scripts/run_gazebo_static_demo.sh
+```
+
+The generated `synthetic_demo.sdf` applies one uniform, visualization-only scale and translation to every region vertex and goal so the complete scene fits a compact 12 m square. Original map coordinates are unchanged and remain recorded beside the visual Gazebo coordinates in `gazebo_demo_manifest.json`; this display transform is never written back to either source artifact. The manifest and visible center-marker heights use the fixed legend `1 = living_room`, `2 = kitchen`, `3 = bedroom`, `4 = charging_area`. `SYNTHETIC DEMO LABELS`, `NOT GROUND TRUTH`, `SIMULATION / REVIEW ONLY`, and `ROBOT MOTION DISABLED` are intentional warnings. This is a static visual inspection aid, not autonomous navigation.
+
 ## Completed Modules
 
 - JSON-only LLM planning with atomic one-to-five-step semantic navigation
