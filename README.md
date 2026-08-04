@@ -151,6 +151,36 @@ python3 scripts/run_simulation_evaluation.py \
 
 The evaluation always uses the fixed four-step sequence `living_room`, `kitchen`, `bedroom`, `charging_area`; reordering, custom labels, and reduced sequences are not supported. The result is a reproducible simulation-state-machine evaluation, not a real robot navigation, Nav2, dynamic-obstacle, room-semantic, or fault-detection experiment. Inputs retain the sequence executor's strict map-identity, provenance, review-only, simulation-only, non-executable, and selector-evidence validation. Evaluation accepts only structurally valid and internally consistent selector-style artifacts; it does not authenticate file provenance and is intended for a local simulation-only review pipeline. Complete internally consistent imitations are outside this threat model.
 
+### Simulation-only smart-home skills
+
+The declaration-driven smart-home layer exposes 50 local review capabilities without creating 50 separate executors. `skill_catalog.py` describes each capability and its parameters and policies, `skill_planner.py` compiles shared actions against existing accepted demo goals, and `skill_runtime.py` applies deterministic logical transitions, bounded recovery, simulated battery policy, checkpoints, and stable priority/FIFO queue rules. Every navigation-like action carries the original accepted goal reference; no skill contains hard-coded coordinates or recomputes polygon/raster safety.
+
+```bash
+python3 scripts/list_simulation_skills.py
+python3 scripts/list_simulation_skills.py --category item_service --json
+
+python3 scripts/preview_simulation_skill.py \
+  --skill patrol_home \
+  --semantic-regions REGIONS.json \
+  --safe-goals GOALS.json \
+  --output-dir local_annotations/patrol_preview
+
+python3 scripts/run_simulation_skill.py \
+  --skill deliver_item \
+  --semantic-regions REGIONS.json \
+  --safe-goals GOALS.json \
+  --param item=medicine \
+  --param source=kitchen \
+  --param destination=bedroom \
+  --output-dir local_annotations/deliver_item_demo
+```
+
+Failure, timeout, cancellation, preemption, alarm, and low-battery behavior are explicit simulation injections through repeatable `--inject-event KEY=VALUE` options or fixed local-state options such as `--battery-percent`, `--restricted-region`, and `--blocked-goal`. The last two options may appear at most once; `--param` and `--inject-event` remain repeatable only for distinct keys. The centralized low/critical battery thresholds are 20%/10%, and retry is capped at one. Ordinary request priorities are strict integers 0–99. Only queued `emergency_response` and `emergency_task_preemption` receive immutable priority 100; every other capability, including safety-policy skills, remains in the ordinary range. Queue entries receive state-owned monotonic IDs such as `task-000001`, independent of caller `request_id`, and equal priority remains FIFO. Fixed routines are never energy-reordered. The current accepted-artifact contract exposes one unique goal per label, so blocking that sole goal fails closed with `NO_ALTERNATE_SAFE_GOAL` rather than generating coordinates. A successful same-region alternative would require a separately reviewed upstream artifact-contract change and is not fabricated here.
+
+`preview_skill_plan` and `explain_skill_plan` each require `target_skill` plus that target skill's normal parameters. Both compile the real target plan from the same validated artifacts without executing it; preview preserves pending steps and zero events, while explain adds per-step rationale, parameter source, goal reference, and safety policy. `list_capabilities` returns the full deterministic 50-entry catalog; its JSON form is machine-readable and its human form includes compact builder, flags, and policy summaries. `change_task_priority` requires a state-generated `task_id` and `new_priority`, changes only a queued normal task, and rejects active or allowlisted-emergency tasks. Checkpoint identifiers must be non-empty trimmed strings; tuple-like and JSON typed literals are rejected by the CLI for `checkpoint_id`. `check_all_rooms` adds a synthetic aggregate check summary after individual room checks; `patrol_home` does not. A timed-out step records `timeout_exceeded`; its cancelled suffix records `upstream_timeout`.
+
+Each preview or run publishes exactly `skill_request.json`, `skill_plan.json`, `skill_result.json`, `skill_events.jsonl`, and `skill_report.md` into a new directory by one sibling-directory rename. Every emitted JSONL event is explicitly `synthetic: true`, `review_only: true`, `simulation_only: true`, and `executable: false`. The report states the simulation/review boundary. The layer validates schema, strict flags, identity, provenance relationships, and existing selector evidence, but does not authenticate file provenance; a complete internally consistent imitation is outside this local threat model. It sends no ROS/Nav2/Gazebo/IoT/manipulation/sensor or robot command. The full catalog, parameters, policies, examples, and future adapter boundary are in [docs/simulation_skills.md](docs/simulation_skills.md).
+
 ### Static Gazebo Sim visualization
 
 The first 3D visualization prototype is a separate static, simulation-only view. It reads the existing synthetic region and accepted safe-goal artifacts, materializes the installed TurtleBot4 Jazzy standard Xacro as a static model, and generates a small independent SDF world with colored region edges and goal markers. It does not use the system warehouse world, does not start ROS/Nav2/RViz, and sends no robot commands.
