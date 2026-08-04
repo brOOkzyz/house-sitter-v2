@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import math
+import hashlib
+import json
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -26,6 +28,8 @@ class PgmImage:
     pixels: bytes
     format: str
     max_value: int
+    source_sha256: str = ""
+    source_bytes: bytes = b""
 
 
 @dataclass(frozen=True)
@@ -53,6 +57,36 @@ class RosMapMetadata:
         )
 
 
+@dataclass(frozen=True)
+class MapIdentity:
+    """Canonical identity for a map image and the ROS metadata that interprets it."""
+
+    schema_version: str
+    width: int
+    height: int
+    resolution: float
+    origin: tuple[float, float, float]
+    negate: int
+    occupied_thresh: float
+    free_thresh: float
+    image_sha256: str
+    fingerprint: str
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "schema_version": self.schema_version,
+            "width": self.width,
+            "height": self.height,
+            "resolution": self.resolution,
+            "origin": list(self.origin),
+            "negate": self.negate,
+            "occupied_thresh": self.occupied_thresh,
+            "free_thresh": self.free_thresh,
+            "image_sha256": self.image_sha256,
+            "fingerprint": self.fingerprint,
+        }
+
+
 def _finite_number(value: Any, field: str) -> float:
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         raise MapMetadataError(f"{field} must be a finite number.")
@@ -60,6 +94,39 @@ def _finite_number(value: Any, field: str) -> float:
     if not math.isfinite(numeric):
         raise MapMetadataError(f"{field} must be a finite number.")
     return numeric
+
+
+def map_identity(metadata: RosMapMetadata) -> MapIdentity:
+    """Fingerprint canonical map metadata together with the raw PGM pixels once."""
+    raw_image_bytes = metadata.image.source_bytes or metadata.image.pixels
+    image_digest = metadata.image.source_sha256 or hashlib.sha256(raw_image_bytes).hexdigest()
+    canonical_metadata = {
+        "schema_version": "1.0",
+        "width": metadata.image.width,
+        "height": metadata.image.height,
+        "resolution": metadata.resolution,
+        "origin": list(metadata.origin),
+        "negate": metadata.negate,
+        "occupied_thresh": metadata.occupied_thresh,
+        "free_thresh": metadata.free_thresh,
+        "image_sha256": image_digest,
+    }
+    encoded = json.dumps(canonical_metadata, sort_keys=True, separators=(",", ":"), allow_nan=False).encode(
+        "utf-8"
+    )
+    fingerprint = hashlib.sha256(encoded + b"\0" + raw_image_bytes).hexdigest()
+    return MapIdentity(
+        schema_version="1.0",
+        width=metadata.image.width,
+        height=metadata.image.height,
+        resolution=metadata.resolution,
+        origin=metadata.origin,
+        negate=metadata.negate,
+        occupied_thresh=metadata.occupied_thresh,
+        free_thresh=metadata.free_thresh,
+        image_sha256=image_digest,
+        fingerprint=fingerprint,
+    )
 
 
 def _read_yaml(path: Path) -> dict[str, Any]:
@@ -138,7 +205,7 @@ def load_pgm(path: Path) -> PgmImage:
         if len(values) != expected_pixels:
             raise MapMetadataError("PGM pixel data is truncated or has an unexpected length.")
         raw = bytes(round(value * 255 / max_value) for value in values)
-        return PgmImage(width, height, raw, "P2", max_value)
+        return PgmImage(width, height, raw, "P2", max_value, hashlib.sha256(data).hexdigest(), data)
 
     if position >= len(data) or data[position] not in b" \t\r\n":
         raise MapMetadataError("P5 PGM header must end with whitespace before pixel data.")
@@ -150,7 +217,7 @@ def load_pgm(path: Path) -> PgmImage:
         raise MapMetadataError("P5 PGM pixel data is truncated or has an unexpected length.")
     if max_value != 255:
         raw = bytes(round(value * 255 / max_value) for value in raw)
-    return PgmImage(width, height, raw, "P5", max_value)
+    return PgmImage(width, height, raw, "P5", max_value, hashlib.sha256(data).hexdigest(), data)
 
 
 def load_ros_map(path: Path) -> RosMapMetadata:

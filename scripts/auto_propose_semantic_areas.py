@@ -40,7 +40,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     )
     parser.add_argument("--map", required=True, type=Path, help="ROS map YAML")
     parser.add_argument("--registry", type=Path, default=DEFAULT_REGISTRY_PATH)
-    parser.add_argument("--map-id", required=True, help="Manual map identifier; fingerprinting is not implemented")
+    parser.add_argument("--map-id", required=True, help="Manual map identifier; generated reports also carry strict map identity")
     parser.add_argument("--auto-propose", action="store_true", help="Compatibility flag; proposal mode is the default")
     parser.add_argument(
         "--proposal-mode",

@@ -27,7 +27,12 @@ from .automatic_area_proposal import (
     propose_semantic_areas,
 )
 from .map_coordinates import map_to_pixel, pixel_to_map
-from .map_metadata import MapMetadataError, PgmImage, RosMapMetadata, load_pgm, load_ros_map
+from .map_metadata import MapIdentity, MapMetadataError, PgmImage, RosMapMetadata, load_pgm, load_ros_map, map_identity
+from .offline_safe_goal_selection import (
+    OfflineSafeGoalSelectionError,
+    OfflineSafeGoalSelectionResult,
+    select_offline_safe_goals,
+)
 from .semantic_annotation import SemanticAnnotationError, SemanticAnnotationSession
 from .semantic_waypoints import (
     PolygonGeometry,
@@ -57,12 +62,17 @@ __all__ = [
     "classify_occupancy",
     "propose_semantic_areas",
     "MapMetadataError",
+    "MapIdentity",
     "PgmImage",
     "RosMapMetadata",
     "load_pgm",
     "load_ros_map",
+    "map_identity",
     "pixel_to_map",
     "map_to_pixel",
+    "OfflineSafeGoalSelectionError",
+    "OfflineSafeGoalSelectionResult",
+    "select_offline_safe_goals",
     "SemanticAnnotationError",
     "SemanticAnnotationSession",
     "Nav2ActionClient",

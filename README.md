@@ -51,7 +51,7 @@ For a read-only map check without opening a GUI:
 python3 scripts/annotate_semantic_areas.py --map maps/minimal_slam_map.yaml --inspect-map
 ```
 
-`map_id` is manually supplied in this prototype; map fingerprinting is not implemented yet. Polygons are validated local annotations only: they do not yet select safe goals or produce Nav2 poses.
+Manual annotation still uses a manually supplied `map_id`; it does not yet carry the automatic workflow's strict map-identity binding. Its polygons remain local validated annotations and do not produce Nav2 poses.
 
 ### Automatic area proposals
 
@@ -66,7 +66,7 @@ python3 scripts/auto_propose_semantic_areas.py \
   --proposal-output local_annotations/auto_area_proposals.json
 ```
 
-`--dry-run` prints candidates without writing files. The PNG and JSON are local, Git-ignored review artifacts. Automatic geometry does not establish room semantics: candidates without repository-backed location evidence are `unassigned`; an elongated region can only be a low-confidence `hallway` suggestion. Every automatic result requires human review, is not written into production configuration, and does not start ROS, Gazebo, Nav2, or navigation. Map fingerprinting and safe-goal selection remain unimplemented.
+`--dry-run` prints candidates without writing files. The PNG and JSON are local, Git-ignored review artifacts. Automatic proposals carry strict map identity (canonical metadata, image SHA-256, and fingerprint). Automatic geometry does not establish room semantics: candidates without repository-backed location evidence are `unassigned`; an elongated region can only be a low-confidence `hallway` suggestion. Every automatic result requires human review, is not written into production configuration, and does not start ROS, Gazebo, Nav2, or navigation.
 
 `legacy` is the default proposal mode and keeps the original connected-component contour workflow. The optional `--proposal-mode hole-aware-cells` performs a conservative partition of clearance-safe observed free space so that candidates containing obstacle holes are not accepted as one polygon. It is explicitly review-only: every output remains `canonical_label: null`, `suggested_label: unassigned`, and `status: proposed`; it is not a room annotation and cannot enter the production registry.
 
@@ -74,7 +74,24 @@ For hole-aware review, `safe_candidates.json` records every candidate that passe
 
 The TurtleBot 4 warehouse map is a technical validation map for occupancy geometry, polygon validation, deterministic partitioning, safety checks, and review-batch selection only. It is not a residential semantic map: its observed free-space zones are never evidence for kitchen, bedroom, `living_room`, or other household labels. They remain review-only, unassigned, and outside the production semantic registry.
 
-Future work may select a safe reachable goal from a validated user polygon. This phase performs neither safe-goal selection nor Nav2 execution.
+### Offline safe-goal review
+
+`scripts/select_safe_goals.py` is an offline preprocessing tool for human review, not an online navigation system. It reads an existing occupancy map and proposal report, revalidates every polygon against the current map, and deterministically selects review-only observed-free-space goals. Input safety booleans are provenance claims only and never authorize a goal. The report must carry matching strict `map_identity` metadata (canonical map metadata, image SHA-256, and fingerprint); missing or mismatched identity fails closed.
+
+```bash
+python3 scripts/select_safe_goals.py \
+  --map maps/minimal_slam_map.yaml \
+  --candidates local_annotations/auto_area_proposals.json \
+  --candidate-source selected \
+  --minimum-clearance-m 0.30 \
+  --output-dir local_annotations/safe_goal_selection_run_001
+```
+
+The output directory must not already exist. Overwrite, force, backup, and rollback are deliberately unsupported: all three artifacts are created in a sibling temporary directory, then published by one rename; failures clean only the unpublished temporary directory. The tool writes exactly `safe_goal_candidates.json`, `rejected_safe_goals.json`, and `safe_goal_preview.png`.
+
+Each accepted point passes the current geometry validator, bounds validation, full strict-interior raster evaluation, and final goal assertion. Raster counts and ratios are `null` when raster evaluation did not run. Accepted and rejected records carry locally computed `faster_safety_passed`; rejected records are always false. `goal_order` is final contiguous 1-based order, `source_candidate_order` is the original JSON-array position, and `source_selection_rank` preserves the source value or null. Duplicate polygons are rejected; distinct polygons selecting the same pixel retain the first stable `(proposal_id, partition_id)` candidate.
+
+Results are review-only observed free-space goals, not rooms, not semantic annotations, and not executable navigation commands. The tool never modifies maps or the production registry, starts ROS/Gazebo/Nav2, or sends movement commands. The warehouse remains a technical validation map, never a residential semantic map.
 
 ## Completed Modules
 
@@ -152,7 +169,7 @@ saved-map localization + Nav2 readiness: PASS
 simulation-only undock: PASS
 simulation-only micro Nav2 navigation: PASS
 LLM-to-simulation Nav2 demo: PASS
-pytest: 73 passed
+pytest: run `python3 -m pytest -q` for the current result
 ```
 
 Final demo evidence image:

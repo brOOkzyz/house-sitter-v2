@@ -14,7 +14,7 @@ import numpy as np
 from scipy import ndimage
 
 from .map_coordinates import pixel_to_map
-from .map_metadata import MapMetadataError, RosMapMetadata
+from .map_metadata import MapMetadataError, RosMapMetadata, map_identity
 from .semantic_waypoints import SemanticWaypointError, SemanticWaypointRegistry
 
 
@@ -704,6 +704,7 @@ def proposal_report(
             "occupied_thresh": metadata.occupied_thresh,
             "free_thresh": metadata.free_thresh,
         },
+        "map_identity": map_identity(metadata).as_dict(),
         "algorithm_parameters": algorithm_parameters,
         "warnings": (
             ["No validated candidate polygons were found; occupancy-grid geometry alone was insufficient."]
@@ -741,6 +742,7 @@ def safe_candidates_report(
         "schema_version": "1.0",
         "proposal_mode": "hole-aware-cells",
         "map_id": map_id,
+        "map_identity": map_identity(metadata).as_dict(),
         "total_partition_count": batch.partition_info.get("partition_count", 0),
         "safe_candidate_count": len(batch.safe_candidates),
         "selected_count": len(batch.selected_proposals),
