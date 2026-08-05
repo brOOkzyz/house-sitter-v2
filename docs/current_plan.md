@@ -3,19 +3,27 @@ Current Development Plan
 
 ## Project Direction
 
-`house_sitter_v2` is a simulation-only LLM-assisted house-sitter robot prototype.
+`house_sitter_v2` is a simulation-only house-sitter environment-monitoring research prototype.
 
-Current pipeline:
+Project 25 research mainline:
 
 ```text
-user prompt
--> JSON-only LLM planner
--> verified JSON task plan
--> dry-run or simulation-only executor
--> task report
+idle-period autonomous patrol
+-> simulated onboard sensor observation
+-> environmental anomaly detection
+-> residential Digital Twin update
+-> explainable actionable alert
+-> structured evaluation
 ```
 
-Physical robot deployment is outside the project scope.
+The first complete vertical slice is `kitchen_unexpected_obstacle`: a deterministic `house_v1` patrol visits
+`living_room -> kitchen -> bedroom -> bathroom -> charging_area`, injects one kitchen obstacle observation, updates the
+Digital Twin, creates an actionable alert, and returns logically to `charging_area`. It reuses the committed house_v1
+map/semantic regions/accepted safe goals and has no ROS, Gazebo, Nav2, RViz, network, LLM, hardware, or real-sensor path.
+
+Natural language, the 50-skill catalog, `SkillRequest`, planner, safe-goal validation, house_v1 visual demo, and warehouse
+Gazebo/Nav2 regression remain useful constrained entry, planning, visualization, and regression modules. They no longer
+constitute the central paper contribution. Physical robot deployment remains outside scope.
 
 ## Multi-step Semantic Navigation
 

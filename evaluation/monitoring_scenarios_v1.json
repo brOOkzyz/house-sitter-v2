@@ -1,0 +1,12 @@
+{
+  "schema_version": "1.0",
+  "scenarios": [
+    {
+      "scenario_id": "kitchen_unexpected_obstacle",
+      "description": "Deterministic house_v1 patrol with one new kitchen obstacle.",
+      "injection": {"room_id": "kitchen", "unexpected_obstacle": true},
+      "simulation_only": true,
+      "real_robot_supported": false
+    }
+  ]
+}

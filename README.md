@@ -1,23 +1,34 @@
 House Sitter v2
 ================
 
-`house_sitter_v2` is a simulation-only LLM-assisted house-sitter robot prototype. It lives alongside the older Create3 demo in the same workspace and does not modify the legacy files.
+`house_sitter_v2` is a simulation-only house-sitter environment-monitoring research prototype. It lives alongside the older Create3 demo in the same workspace and does not modify the legacy files.
 
 ## Project Positioning
 
-This project uses a constrained planning pipeline:
+The Project 25 research mainline is:
 
 ```text
-natural-language prompt
--> JSON-only LLM planner
--> JSON task plan
--> verifier
--> executor
--> task report
--> simulation-only Nav2 safety layer
+idle-period autonomous patrol
+-> simulated onboard observations
+-> environmental anomaly detection
+-> residential Digital Twin update
+-> explainable actionable alert
+-> structured evaluation
 ```
 
-Physical robot deployment is outside the project scope.
+The first complete vertical slice is the deterministic `house_v1` kitchen-obstacle scenario. It reuses the committed
+residential map, semantic regions and accepted safe goals, but does not move a robot or start ROS/Gazebo/Nav2. Run it with:
+
+```bash
+python3 scripts/run_house_sitter_monitoring.py \
+  --scenario kitchen_unexpected_obstacle \
+  --output-dir /tmp/house_sitter_monitoring_demo
+```
+
+Natural language, the 50 skills, `SkillRequest`, planner, safe-goal validation, warehouse regression environment and
+house_v1 visual demonstrations remain available as constrained task-entry and simulation-support modules. They are not
+the primary research contribution; the monitoring/Digital Twin/evaluation chain is. Physical robot deployment remains
+outside scope. See [docs/house_sitter_monitoring.md](docs/house_sitter_monitoring.md).
 
 ## Multi-step Semantic Navigation
 
