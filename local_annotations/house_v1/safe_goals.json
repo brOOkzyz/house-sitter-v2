@@ -1,0 +1,644 @@
+{
+  "accepted_goal_count": 6,
+  "candidate_source": "house_v1_manual_geometry",
+  "demo_only": true,
+  "executable": false,
+  "goals": [
+    {
+      "candidate_partition_id": "house_v1_living_room_region",
+      "canonical_label": "living_room",
+      "confirmed": true,
+      "demo_assignment_order": 1,
+      "demo_only": true,
+      "evidence": [
+        "house_v1 room polygon",
+        "house_v1 deterministic occupancy map",
+        "free pixel",
+        "manual clearance review"
+      ],
+      "executable": false,
+      "faster_safety_passed": true,
+      "goal": {
+        "clearance_m": 0.65,
+        "clearance_pixels": 13.0,
+        "map_x": 3.5,
+        "map_y": 3.1,
+        "pixel_column": 69,
+        "pixel_row": 138,
+        "yaw": 0.0
+      },
+      "goal_order": 1,
+      "ground_truth": false,
+      "map_id": "house_v1",
+      "map_identity": {
+        "fingerprint": "214b594c248949be9c532c15ebf33dd9d65e0976ffc51f86dad4ac36af4b0090",
+        "free_thresh": 0.196,
+        "height": 200,
+        "image_sha256": "5318df2500a37ae3844fa7d96bdd1cd05ffeff7200afa70665793ce926a3da53",
+        "negate": 0,
+        "occupied_thresh": 0.65,
+        "origin": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "resolution": 0.05,
+        "schema_version": "1.0",
+        "width": 240
+      },
+      "partition_id": "house_v1_living_room_region",
+      "polygon": {
+        "type": "polygon",
+        "vertices": [
+          [
+            0.35,
+            0.35
+          ],
+          [
+            5.75,
+            0.35
+          ],
+          [
+            5.75,
+            3.75
+          ],
+          [
+            0.35,
+            3.75
+          ]
+        ]
+      },
+      "polygon_validation_passed": true,
+      "proposal_id": "house_v1_living_room_safe_goal",
+      "provenance": [
+        "house_v1_manual_geometry",
+        "house_v1_deterministic_occupancy"
+      ],
+      "raster_safety_evidence": {
+        "bounds_validation_passed": true,
+        "failure_reasons": [],
+        "free_count": 1,
+        "occupied_count": 0,
+        "out_of_bounds_count": 0,
+        "passed": true,
+        "polygon_validation_passed": true,
+        "raster_evaluation_completed": true,
+        "rasterized_pixel_count": 1,
+        "safe_free_ratio": 1.0,
+        "unknown_count": 0
+      },
+      "real_robot_supported": false,
+      "review_only": true,
+      "selection_method": "house_v1 reviewed room-centre goal with deterministic raster verification",
+      "simulation_only": true,
+      "source": {
+        "candidate_source": "house_v1_manual_geometry",
+        "source_faster_safety_claim": true,
+        "source_polygon_validation_claim": true,
+        "source_raster_safety_claim": true
+      },
+      "source_candidate_order": 1,
+      "source_selection_rank": 1,
+      "status": "accepted",
+      "suggested_label": "living_room",
+      "synthetic_semantics": true
+    },
+    {
+      "candidate_partition_id": "house_v1_kitchen_region",
+      "canonical_label": "kitchen",
+      "confirmed": true,
+      "demo_assignment_order": 2,
+      "demo_only": true,
+      "evidence": [
+        "house_v1 room polygon",
+        "house_v1 deterministic occupancy map",
+        "free pixel",
+        "manual clearance review"
+      ],
+      "executable": false,
+      "faster_safety_passed": true,
+      "goal": {
+        "clearance_m": 0.6,
+        "clearance_pixels": 11.999999999999998,
+        "map_x": 8.25,
+        "map_y": 3.15,
+        "pixel_column": 164,
+        "pixel_row": 137,
+        "yaw": 0.0
+      },
+      "goal_order": 2,
+      "ground_truth": false,
+      "map_id": "house_v1",
+      "map_identity": {
+        "fingerprint": "214b594c248949be9c532c15ebf33dd9d65e0976ffc51f86dad4ac36af4b0090",
+        "free_thresh": 0.196,
+        "height": 200,
+        "image_sha256": "5318df2500a37ae3844fa7d96bdd1cd05ffeff7200afa70665793ce926a3da53",
+        "negate": 0,
+        "occupied_thresh": 0.65,
+        "origin": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "resolution": 0.05,
+        "schema_version": "1.0",
+        "width": 240
+      },
+      "partition_id": "house_v1_kitchen_region",
+      "polygon": {
+        "type": "polygon",
+        "vertices": [
+          [
+            6.25,
+            0.35
+          ],
+          [
+            11.65,
+            0.35
+          ],
+          [
+            11.65,
+            3.75
+          ],
+          [
+            6.25,
+            3.75
+          ]
+        ]
+      },
+      "polygon_validation_passed": true,
+      "proposal_id": "house_v1_kitchen_safe_goal",
+      "provenance": [
+        "house_v1_manual_geometry",
+        "house_v1_deterministic_occupancy"
+      ],
+      "raster_safety_evidence": {
+        "bounds_validation_passed": true,
+        "failure_reasons": [],
+        "free_count": 1,
+        "occupied_count": 0,
+        "out_of_bounds_count": 0,
+        "passed": true,
+        "polygon_validation_passed": true,
+        "raster_evaluation_completed": true,
+        "rasterized_pixel_count": 1,
+        "safe_free_ratio": 1.0,
+        "unknown_count": 0
+      },
+      "real_robot_supported": false,
+      "review_only": true,
+      "selection_method": "house_v1 reviewed room-centre goal with deterministic raster verification",
+      "simulation_only": true,
+      "source": {
+        "candidate_source": "house_v1_manual_geometry",
+        "source_faster_safety_claim": true,
+        "source_polygon_validation_claim": true,
+        "source_raster_safety_claim": true
+      },
+      "source_candidate_order": 2,
+      "source_selection_rank": 2,
+      "status": "accepted",
+      "suggested_label": "kitchen",
+      "synthetic_semantics": true
+    },
+    {
+      "candidate_partition_id": "house_v1_bedroom_region",
+      "canonical_label": "bedroom",
+      "confirmed": true,
+      "demo_assignment_order": 3,
+      "demo_only": true,
+      "evidence": [
+        "house_v1 room polygon",
+        "house_v1 deterministic occupancy map",
+        "free pixel",
+        "manual clearance review"
+      ],
+      "executable": false,
+      "faster_safety_passed": true,
+      "goal": {
+        "clearance_m": 0.8,
+        "clearance_pixels": 16.0,
+        "map_x": 2.5,
+        "map_y": 7.25,
+        "pixel_column": 49,
+        "pixel_row": 55,
+        "yaw": 0.0
+      },
+      "goal_order": 3,
+      "ground_truth": false,
+      "map_id": "house_v1",
+      "map_identity": {
+        "fingerprint": "214b594c248949be9c532c15ebf33dd9d65e0976ffc51f86dad4ac36af4b0090",
+        "free_thresh": 0.196,
+        "height": 200,
+        "image_sha256": "5318df2500a37ae3844fa7d96bdd1cd05ffeff7200afa70665793ce926a3da53",
+        "negate": 0,
+        "occupied_thresh": 0.65,
+        "origin": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "resolution": 0.05,
+        "schema_version": "1.0",
+        "width": 240
+      },
+      "partition_id": "house_v1_bedroom_region",
+      "polygon": {
+        "type": "polygon",
+        "vertices": [
+          [
+            0.35,
+            6.25
+          ],
+          [
+            6.35,
+            6.25
+          ],
+          [
+            6.35,
+            9.65
+          ],
+          [
+            0.35,
+            9.65
+          ]
+        ]
+      },
+      "polygon_validation_passed": true,
+      "proposal_id": "house_v1_bedroom_safe_goal",
+      "provenance": [
+        "house_v1_manual_geometry",
+        "house_v1_deterministic_occupancy"
+      ],
+      "raster_safety_evidence": {
+        "bounds_validation_passed": true,
+        "failure_reasons": [],
+        "free_count": 1,
+        "occupied_count": 0,
+        "out_of_bounds_count": 0,
+        "passed": true,
+        "polygon_validation_passed": true,
+        "raster_evaluation_completed": true,
+        "rasterized_pixel_count": 1,
+        "safe_free_ratio": 1.0,
+        "unknown_count": 0
+      },
+      "real_robot_supported": false,
+      "review_only": true,
+      "selection_method": "house_v1 reviewed room-centre goal with deterministic raster verification",
+      "simulation_only": true,
+      "source": {
+        "candidate_source": "house_v1_manual_geometry",
+        "source_faster_safety_claim": true,
+        "source_polygon_validation_claim": true,
+        "source_raster_safety_claim": true
+      },
+      "source_candidate_order": 3,
+      "source_selection_rank": 3,
+      "status": "accepted",
+      "suggested_label": "bedroom",
+      "synthetic_semantics": true
+    },
+    {
+      "candidate_partition_id": "house_v1_bathroom_region",
+      "canonical_label": "bathroom",
+      "confirmed": true,
+      "demo_assignment_order": 4,
+      "demo_only": true,
+      "evidence": [
+        "house_v1 room polygon",
+        "house_v1 deterministic occupancy map",
+        "free pixel",
+        "manual clearance review"
+      ],
+      "executable": false,
+      "faster_safety_passed": true,
+      "goal": {
+        "clearance_m": 0.55,
+        "clearance_pixels": 11.0,
+        "map_x": 7.65,
+        "map_y": 7.55,
+        "pixel_column": 152,
+        "pixel_row": 49,
+        "yaw": 0.0
+      },
+      "goal_order": 4,
+      "ground_truth": false,
+      "map_id": "house_v1",
+      "map_identity": {
+        "fingerprint": "214b594c248949be9c532c15ebf33dd9d65e0976ffc51f86dad4ac36af4b0090",
+        "free_thresh": 0.196,
+        "height": 200,
+        "image_sha256": "5318df2500a37ae3844fa7d96bdd1cd05ffeff7200afa70665793ce926a3da53",
+        "negate": 0,
+        "occupied_thresh": 0.65,
+        "origin": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "resolution": 0.05,
+        "schema_version": "1.0",
+        "width": 240
+      },
+      "partition_id": "house_v1_bathroom_region",
+      "polygon": {
+        "type": "polygon",
+        "vertices": [
+          [
+            6.85,
+            6.25
+          ],
+          [
+            8.75,
+            6.25
+          ],
+          [
+            8.75,
+            9.65
+          ],
+          [
+            6.85,
+            9.65
+          ]
+        ]
+      },
+      "polygon_validation_passed": true,
+      "proposal_id": "house_v1_bathroom_safe_goal",
+      "provenance": [
+        "house_v1_manual_geometry",
+        "house_v1_deterministic_occupancy"
+      ],
+      "raster_safety_evidence": {
+        "bounds_validation_passed": true,
+        "failure_reasons": [],
+        "free_count": 1,
+        "occupied_count": 0,
+        "out_of_bounds_count": 0,
+        "passed": true,
+        "polygon_validation_passed": true,
+        "raster_evaluation_completed": true,
+        "rasterized_pixel_count": 1,
+        "safe_free_ratio": 1.0,
+        "unknown_count": 0
+      },
+      "real_robot_supported": false,
+      "review_only": true,
+      "selection_method": "house_v1 reviewed room-centre goal with deterministic raster verification",
+      "simulation_only": true,
+      "source": {
+        "candidate_source": "house_v1_manual_geometry",
+        "source_faster_safety_claim": true,
+        "source_polygon_validation_claim": true,
+        "source_raster_safety_claim": true
+      },
+      "source_candidate_order": 4,
+      "source_selection_rank": 4,
+      "status": "accepted",
+      "suggested_label": "bathroom",
+      "synthetic_semantics": true
+    },
+    {
+      "candidate_partition_id": "house_v1_hallway_region",
+      "canonical_label": "hallway",
+      "confirmed": true,
+      "demo_assignment_order": 5,
+      "demo_only": true,
+      "evidence": [
+        "house_v1 room polygon",
+        "house_v1 deterministic occupancy map",
+        "free pixel",
+        "manual clearance review"
+      ],
+      "executable": false,
+      "faster_safety_passed": true,
+      "goal": {
+        "clearance_m": 0.75,
+        "clearance_pixels": 15.0,
+        "map_x": 5.0,
+        "map_y": 5.0,
+        "pixel_column": 99,
+        "pixel_row": 100,
+        "yaw": 0.0
+      },
+      "goal_order": 5,
+      "ground_truth": false,
+      "map_id": "house_v1",
+      "map_identity": {
+        "fingerprint": "214b594c248949be9c532c15ebf33dd9d65e0976ffc51f86dad4ac36af4b0090",
+        "free_thresh": 0.196,
+        "height": 200,
+        "image_sha256": "5318df2500a37ae3844fa7d96bdd1cd05ffeff7200afa70665793ce926a3da53",
+        "negate": 0,
+        "occupied_thresh": 0.65,
+        "origin": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "resolution": 0.05,
+        "schema_version": "1.0",
+        "width": 240
+      },
+      "partition_id": "house_v1_hallway_region",
+      "polygon": {
+        "type": "polygon",
+        "vertices": [
+          [
+            0.35,
+            4.25
+          ],
+          [
+            11.65,
+            4.25
+          ],
+          [
+            11.65,
+            5.75
+          ],
+          [
+            0.35,
+            5.75
+          ]
+        ]
+      },
+      "polygon_validation_passed": true,
+      "proposal_id": "house_v1_hallway_safe_goal",
+      "provenance": [
+        "house_v1_manual_geometry",
+        "house_v1_deterministic_occupancy"
+      ],
+      "raster_safety_evidence": {
+        "bounds_validation_passed": true,
+        "failure_reasons": [],
+        "free_count": 1,
+        "occupied_count": 0,
+        "out_of_bounds_count": 0,
+        "passed": true,
+        "polygon_validation_passed": true,
+        "raster_evaluation_completed": true,
+        "rasterized_pixel_count": 1,
+        "safe_free_ratio": 1.0,
+        "unknown_count": 0
+      },
+      "real_robot_supported": false,
+      "review_only": true,
+      "selection_method": "house_v1 reviewed room-centre goal with deterministic raster verification",
+      "simulation_only": true,
+      "source": {
+        "candidate_source": "house_v1_manual_geometry",
+        "source_faster_safety_claim": true,
+        "source_polygon_validation_claim": true,
+        "source_raster_safety_claim": true
+      },
+      "source_candidate_order": 5,
+      "source_selection_rank": 5,
+      "status": "accepted",
+      "suggested_label": "hallway",
+      "synthetic_semantics": true
+    },
+    {
+      "candidate_partition_id": "house_v1_charging_area_region",
+      "canonical_label": "charging_area",
+      "confirmed": true,
+      "demo_assignment_order": 6,
+      "demo_only": true,
+      "evidence": [
+        "house_v1 room polygon",
+        "house_v1 deterministic occupancy map",
+        "free pixel",
+        "manual clearance review"
+      ],
+      "executable": false,
+      "faster_safety_passed": true,
+      "goal": {
+        "clearance_m": 0.6,
+        "clearance_pixels": 11.999999999999998,
+        "map_x": 5.35,
+        "map_y": 3.1,
+        "pixel_column": 106,
+        "pixel_row": 138,
+        "yaw": 0.0
+      },
+      "goal_order": 6,
+      "ground_truth": false,
+      "map_id": "house_v1",
+      "map_identity": {
+        "fingerprint": "214b594c248949be9c532c15ebf33dd9d65e0976ffc51f86dad4ac36af4b0090",
+        "free_thresh": 0.196,
+        "height": 200,
+        "image_sha256": "5318df2500a37ae3844fa7d96bdd1cd05ffeff7200afa70665793ce926a3da53",
+        "negate": 0,
+        "occupied_thresh": 0.65,
+        "origin": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "resolution": 0.05,
+        "schema_version": "1.0",
+        "width": 240
+      },
+      "partition_id": "house_v1_charging_area_region",
+      "polygon": {
+        "type": "polygon",
+        "vertices": [
+          [
+            4.85,
+            2.55
+          ],
+          [
+            5.75,
+            2.55
+          ],
+          [
+            5.75,
+            3.65
+          ],
+          [
+            4.85,
+            3.65
+          ]
+        ]
+      },
+      "polygon_validation_passed": true,
+      "proposal_id": "house_v1_charging_area_safe_goal",
+      "provenance": [
+        "house_v1_manual_geometry",
+        "house_v1_deterministic_occupancy"
+      ],
+      "raster_safety_evidence": {
+        "bounds_validation_passed": true,
+        "failure_reasons": [],
+        "free_count": 1,
+        "occupied_count": 0,
+        "out_of_bounds_count": 0,
+        "passed": true,
+        "polygon_validation_passed": true,
+        "raster_evaluation_completed": true,
+        "rasterized_pixel_count": 1,
+        "safe_free_ratio": 1.0,
+        "unknown_count": 0
+      },
+      "real_robot_supported": false,
+      "review_only": true,
+      "selection_method": "house_v1 reviewed room-centre goal with deterministic raster verification",
+      "simulation_only": true,
+      "source": {
+        "candidate_source": "house_v1_manual_geometry",
+        "source_faster_safety_claim": true,
+        "source_polygon_validation_claim": true,
+        "source_raster_safety_claim": true
+      },
+      "source_candidate_order": 6,
+      "source_selection_rank": 6,
+      "status": "accepted",
+      "suggested_label": "charging_area",
+      "synthetic_semantics": true
+    }
+  ],
+  "ground_truth": false,
+  "input_candidate_count": 6,
+  "map_id": "house_v1",
+  "map_identity": {
+    "fingerprint": "214b594c248949be9c532c15ebf33dd9d65e0976ffc51f86dad4ac36af4b0090",
+    "free_thresh": 0.196,
+    "height": 200,
+    "image_sha256": "5318df2500a37ae3844fa7d96bdd1cd05ffeff7200afa70665793ce926a3da53",
+    "negate": 0,
+    "occupied_thresh": 0.65,
+    "origin": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "resolution": 0.05,
+    "schema_version": "1.0",
+    "width": 240
+  },
+  "map_metadata": {
+    "height": 200,
+    "image_path": "maps/house_v1.pgm",
+    "map_fingerprint": "214b594c248949be9c532c15ebf33dd9d65e0976ffc51f86dad4ac36af4b0090",
+    "origin": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "resolution": 0.05,
+    "width": 240,
+    "yaml_path": "maps/house_v1.yaml"
+  },
+  "minimum_clearance_m": 0.45,
+  "provenance": [
+    "house_v1_manual_geometry"
+  ],
+  "real_robot_supported": false,
+  "rejected_goal_count": 0,
+  "review_only": true,
+  "schema_version": "1.0",
+  "simulation_only": true,
+  "synthetic_semantics": true
+}

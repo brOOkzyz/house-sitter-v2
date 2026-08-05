@@ -116,7 +116,7 @@ class SupervisorDemoTests(unittest.TestCase):
         self.assertNotIn("Traceback", output.getvalue())
 
     def test_ready_attach_only_allows_pipeline_after_readiness(self):
-        responses = iter(["y", "y", "c"])
+        responses = iter(["1", "y", "y", "c"])
         demo = demo_module.SupervisorDemo(ROOT, interactive=True, input_func=lambda _: next(responses))
         self.assertTrue(demo.step_preflight())
         fake_node = mock.Mock()

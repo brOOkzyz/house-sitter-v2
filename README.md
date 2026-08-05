@@ -108,6 +108,22 @@ python3 scripts/create_demo_semantic_map.py \
 
 The requested output directory must be new and under Git-ignored `local_annotations/`. It is published once from a sibling temporary directory and contains only the two PNG previews plus `demo_semantic_regions.json`, `safe_goal_candidates.json`, and `rejected_safe_goals.json`.
 
+### house_v1 final residence presentation
+
+`worlds/house_v1.sdf`, `maps/house_v1.yaml`, and `local_annotations/house_v1/` provide a local, primitive-only single-floor residence with geometry-aligned occupancy map, six room regions, and six accepted safe goals. The final presentation deliberately separates two claims:
+
+- Residence semantic planning and navigation evaluation use the committed 2D map/artifacts and the existing deterministic local sequencer. They are simulation-only, review-only, and non-executable.
+- The 3D residence world is a static layout preview. A recorded house_v1 headless smoke reached TurtleBot4 controller activation but Gazebo exited with code 139 and a core dump, so no house_v1 Gazebo execution result is claimed or fabricated.
+
+Warehouse remains the existing Gazebo/Nav2 navigation regression environment. The house_v1 2D review route can be generated without ROS, Gazebo, or Nav2:
+
+```bash
+python3 scripts/run_simulation_sequence.py \
+  --semantic-regions local_annotations/house_v1/semantic_regions.json \
+  --safe-goals local_annotations/house_v1/safe_goals.json \
+  --output-dir local_annotations/house_v1_runs/sequence_001
+```
+
 ### Simulation-only demo sequencer
 
 `scripts/run_simulation_sequence.py` consumes the two synthetic demo JSON artifacts and deterministically simulates the default ordered review sequence: `living_room`, `kitchen`, `bedroom`, `charging_area`. It resolves each label through matching `proposal_id` + `partition_id`, never through array position and never through hard-coded coordinates.
