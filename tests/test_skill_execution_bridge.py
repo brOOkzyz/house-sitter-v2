@@ -43,6 +43,21 @@ class SkillExecutionBridgeTests(unittest.TestCase):
         self.assertEqual(adaptive_timeout_from_feedback(({"estimated_time_remaining_seconds": 1.0},), 100.0), (100.0, "fallback"))
         self.assertEqual(adaptive_timeout_from_feedback(({"estimated_time_remaining_seconds": 1000.0},)), (180.0, "estimated_time_remaining"))
 
+    def test_adaptive_timeout_basis_changes_only_when_timeout_extends(self):
+        self.assertEqual(
+            adaptive_timeout_from_feedback(({"distance_remaining": 1.0},), 75.0, "estimated_time_remaining"),
+            (75.0, "estimated_time_remaining"),
+        )
+        self.assertEqual(
+            adaptive_timeout_from_feedback(({"distance_remaining": 0.0},), 90.0, "distance_remaining"),
+            (90.0, "distance_remaining"),
+        )
+        self.assertEqual(
+            adaptive_timeout_from_feedback(({"estimated_time_remaining_seconds": 80.0},), 75.0, "distance_remaining"),
+            (135.0, "estimated_time_remaining"),
+        )
+        self.assertEqual(adaptive_timeout_from_feedback(({},), 30.0, "fallback"), (30.0, "fallback"))
+
     def test_explicit_timeout_wins_and_artifacts_record_timeout_policy(self):
         request, plan = self.plan()
         result, events = execute_skill_in_simulation(plan, request, FakeNavigationExecutor([NavigationOutcome("succeeded", ({"estimated_time_remaining_seconds": 100.0},))]), timeout_seconds=7.0)

@@ -50,10 +50,11 @@ class NavigationOutcome:
 def adaptive_timeout_from_feedback(
     feedback: tuple[dict[str, Any], ...] | list[dict[str, Any]],
     current_timeout_seconds: float = FALLBACK_TIMEOUT_SECONDS,
+    current_basis: str = "fallback",
 ) -> tuple[float, str]:
     """Return an upward-only bounded timeout from normalized Nav2 feedback."""
     effective = min(MAX_TIMEOUT_SECONDS, max(FALLBACK_TIMEOUT_SECONDS, current_timeout_seconds))
-    basis = "fallback"
+    basis = current_basis
     for item in feedback:
         eta = item.get("estimated_time_remaining_seconds")
         distance = item.get("distance_remaining")
@@ -170,7 +171,7 @@ class Nav2SimulationExecutor(NavigationExecutor):
             started = time.monotonic()
             while not future.done():
                 rclpy.spin_until_future_complete(self._node, future, timeout_sec=min(1.0, effective_timeout))
-                effective_timeout, basis = adaptive_timeout_from_feedback(feedback_list, effective_timeout)
+                effective_timeout, basis = adaptive_timeout_from_feedback(feedback_list, effective_timeout, basis)
                 if time.monotonic() - started >= effective_timeout:
                     break
         else:
