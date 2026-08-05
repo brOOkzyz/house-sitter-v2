@@ -22,8 +22,7 @@ logs/
 .venv/
 
 # User-owned offline semantic-area annotation drafts
-local_annotations/
-!local_annotations/
+local_annotations/*
 !local_annotations/house_v1/
 !local_annotations/house_v1/semantic_regions.json
 !local_annotations/house_v1/safe_goals.json
