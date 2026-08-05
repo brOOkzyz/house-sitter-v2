@@ -40,8 +40,11 @@ class SkillExecutionBridgeTests(unittest.TestCase):
         self.assertEqual(adaptive_timeout_from_feedback(({"estimated_time_remaining_seconds": 40.0},)), (75.0, "estimated_time_remaining"))
         self.assertEqual(adaptive_timeout_from_feedback(({"distance_remaining": 10.0},)), (90.0, "distance_remaining"))
         self.assertEqual(adaptive_timeout_from_feedback(({"distance_remaining": 0.0},)), (30.0, "fallback"))
+        self.assertEqual(adaptive_timeout_from_feedback(({"estimated_time_remaining_seconds": 1.0},)), (30.0, "fallback"))
         self.assertEqual(adaptive_timeout_from_feedback(({"estimated_time_remaining_seconds": 1.0},), 100.0), (100.0, "fallback"))
-        self.assertEqual(adaptive_timeout_from_feedback(({"estimated_time_remaining_seconds": 1000.0},)), (180.0, "estimated_time_remaining"))
+        self.assertEqual(adaptive_timeout_from_feedback(({"estimated_time_remaining_seconds": 140.0},)), (225.0, "estimated_time_remaining"))
+        self.assertEqual(adaptive_timeout_from_feedback(({"estimated_time_remaining_seconds": 1000.0},)), (300.0, "estimated_time_remaining"))
+        self.assertEqual(adaptive_timeout_from_feedback(({"distance_remaining": 1000.0},)), (300.0, "distance_remaining"))
 
     def test_adaptive_timeout_basis_changes_only_when_timeout_extends(self):
         self.assertEqual(

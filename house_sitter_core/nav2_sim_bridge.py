@@ -15,7 +15,7 @@ from typing import Any
 
 NAVIGATION_STATUSES = frozenset({"succeeded", "failed", "cancelled", "timed_out"})
 FALLBACK_TIMEOUT_SECONDS = 30.0
-MAX_TIMEOUT_SECONDS = 180.0
+MAX_TIMEOUT_SECONDS = 300.0
 DISTANCE_FALLBACK_SPEED_MPS = 0.20
 
 

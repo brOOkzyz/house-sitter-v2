@@ -186,7 +186,7 @@ All five are first completed in one sibling `TemporaryDirectory` and published b
 
 ## Optional Gazebo Sim/Nav2 execution bridge
 
-`scripts/run_skill_in_gazebo.py` is an opt-in, simulation-only bridge. It consumes the existing compiler output rather than revalidating or recreating selector, map-identity, provenance, polygon, or raster checks. Navigation steps can be sent only through a Nav2 `NavigateToPose` action in the `map` frame with `use_sim_time`; no `cmd_vel` publisher exists. The default and `--dry-run` modes are ROS-free and send no goals. `--execute-simulation` is required to connect to an existing Gazebo Sim/Nav2 system. Non-navigation steps remain deterministic local simulation records.
+`scripts/run_skill_in_gazebo.py` is an opt-in, simulation-only bridge. It consumes the existing compiler output rather than revalidating or recreating selector, map-identity, provenance, polygon, or raster checks. Navigation steps can be sent only through a Nav2 `NavigateToPose` action in the `map` frame with `use_sim_time`; no `cmd_vel` publisher exists. The default and `--dry-run` modes are ROS-free and send no goals. `--execute-simulation` is required to connect to an existing Gazebo Sim/Nav2 system. Without an explicit timeout, normalized Nav2 feedback can extend the bounded adaptive timeout from 30 to 300 seconds. Non-navigation steps remain deterministic local simulation records.
 
 It atomically publishes `execution_request.json`, `execution_plan.json`, `execution_events.jsonl`, `execution_result.json`, and `execution_report.md`. These retain `simulation_only: true`, `review_only: true`, and `real_robot_supported: false`; `executable: true` means only that an explicit Gazebo/Nav2 simulation action may be attempted.
 
