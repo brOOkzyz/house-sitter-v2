@@ -71,9 +71,12 @@ def run_house_sitter_patrol(root: Path, scenario_id: str = "kitchen_unexpected_o
     anomalies: list[dict[str, Any]] = []
     updates: list[dict[str, Any]] = []
     injection = scenario.get("injection", {})
+    injected_room = scenario.get("injected_room", injection.get("room_id"))
+    injected_values = scenario.get("injected_values", {})
     for step, room_id in enumerate(PATROL_ORDER, start=1):
         unexpected = injection.get("room_id") == room_id and injection.get("unexpected_obstacle") is True
-        observation = observe_room(room_id, step, baseline_rooms[room_id], unexpected_obstacle=unexpected)
+        values = injected_values if injected_room == room_id and isinstance(injected_values, dict) else None
+        observation = observe_room(room_id, step, baseline_rooms[room_id], unexpected_obstacle=unexpected, injected_values=values)
         detected = detect_anomalies(observation, baseline_rooms[room_id])
         after, update = update_room_from_observation(after, observation, detected)
         observations.append(observation); anomalies.extend(detected); updates.append(update)

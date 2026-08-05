@@ -25,6 +25,14 @@ Natural language, the 50-skill catalog, `SkillRequest`, planner, safe-goal valid
 Gazebo/Nav2 regression remain useful constrained entry, planning, visualization, and regression modules. They no longer
 constitute the central paper contribution. Physical robot deployment remains outside scope.
 
+## Research Stage 1: Deterministic Monitoring Benchmark
+
+`evaluation/monitoring_scenarios_v1.json` defines 15 manually authored ground-truth scenarios across normal control,
+unexpected obstacle, layout change, temperature and humidity anomaly categories. `evaluate_monitoring_scenarios.py`
+reuses the single monitoring chain three times per scenario and records TP/FP/FN, type and room correctness, Digital Twin
+update correctness, latency, return-to-charging and deterministic-repeat metrics. Normal controls report recall as
+`not_applicable`; benchmark failures remain explicit records rather than causing threshold or ground-truth changes.
+
 ## Multi-step Semantic Navigation
 
 The plan schema remains at version `1.0` and accepts one to five ordered `navigate_to_waypoint` steps. Gemini produces structured semantic intent only and never supplies physical coordinates, ROS commands, or direct control values. Each semantic destination or alias is resolved using the local user-configured registry in `config/semantic_waypoints.json`, and simulation requests use canonical labels only.

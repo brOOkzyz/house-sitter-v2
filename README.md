@@ -30,6 +30,10 @@ house_v1 visual demonstrations remain available as constrained task-entry and si
 the primary research contribution; the monitoring/Digital Twin/evaluation chain is. Physical robot deployment remains
 outside scope. See [docs/house_sitter_monitoring.md](docs/house_sitter_monitoring.md).
 
+Research Stage 1 adds a deterministic 15-scenario multi-anomaly benchmark with three repeats per scenario. It measures
+TP/FP/FN, anomaly type and room correctness, Digital Twin update correctness, latency and repeatability without changing
+ground truth to hide failures. See [docs/monitoring_benchmark_v1.md](docs/monitoring_benchmark_v1.md).
+
 ## Multi-step Semantic Navigation
 
 The existing schema version `1.0` now supports ordered plans of one to five `navigate_to_waypoint` steps. Gemini generates structured semantic intent only: it cannot provide physical coordinates, ROS commands, direct motion controls, or extra actions and parameters. Every destination is resolved through the local user-configured registry in `config/semantic_waypoints.json`; aliases are accepted only when explicitly configured there and are normalized to canonical labels before request construction.
