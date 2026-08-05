@@ -11,8 +11,13 @@ import argparse
 import heapq
 import json
 import math
+import os
+import shutil
+import signal
+import subprocess
 import sys
 import tempfile
+import time
 import warnings
 from dataclasses import dataclass
 from pathlib import Path
@@ -33,13 +38,107 @@ from house_sitter_core.natural_language_pipeline import run_natural_language_pip
 
 
 TITLE = "2D deterministic residential simulation visualization"
+STATIC_3D_TITLE = "Static 3D residential preview — no robot execution"
 PATROL_ORDER = ("living_room", "kitchen", "bedroom", "bathroom", "charging_area")
 ROBOT_RADIUS_METERS = 0.22
 SAFETY_MARGIN_METERS = 0.10
+STATIC_PREVIEW_SCRIPT = ROOT / "scripts" / "preview_house_v1_3d.sh"
 
 
 class VisualDemoError(ValueError):
     """A concise, user-facing failure in the offline visualization."""
+
+
+def static_preview_ready(root: Path = ROOT, *, find_command: Any = shutil.which) -> tuple[bool, str]:
+    """Check only the local GUI prerequisite; it never probes or starts ROS."""
+    if find_command("gz") is None:
+        return False, "未找到 gz，跳过三维静态住宅预览。"
+    if not (root / "worlds" / "house_v1.sdf").is_file():
+        return False, "未找到 worlds/house_v1.sdf，跳过三维静态住宅预览。"
+    if not (root / "scripts" / "preview_house_v1_3d.sh").is_file():
+        return False, "未找到三维静态预览脚本，跳过预览。"
+    return True, ""
+
+
+def _stop_static_preview(process: subprocess.Popen[Any]) -> None:
+    """Stop only the process group created by this demonstration."""
+    if process.poll() is not None:
+        return
+    try:
+        os.killpg(process.pid, signal.SIGTERM)
+        process.wait(timeout=5)
+    except (OSError, subprocess.TimeoutExpired):
+        try:
+            os.killpg(process.pid, signal.SIGKILL)
+        except OSError:
+            pass
+
+
+def launch_static_preview(
+    *,
+    root: Path = ROOT,
+    popen: Any = subprocess.Popen,
+    sleep: Any = time.sleep,
+) -> bool:
+    """Launch one independent static GUI and wait for the user to close it.
+
+    Its own process group is used solely so Ctrl+C can clean up this child; no
+    external Gazebo or ROS process is inspected, stopped, or otherwise touched.
+    """
+    ready, message = static_preview_ready(root)
+    if not ready:
+        print(message)
+        return False
+    log_file = tempfile.NamedTemporaryFile(prefix="house-v1-static-preview-", suffix=".log", delete=False)
+    log_path = Path(log_file.name)
+    try:
+        process = popen(
+            ["bash", str(root / "scripts" / "preview_house_v1_3d.sh")], cwd=root,
+            stdin=subprocess.DEVNULL, stdout=log_file, stderr=subprocess.STDOUT, start_new_session=True,
+        )
+    except OSError as exc:
+        log_file.close()
+        print(f"三维静态住宅预览无法启动：{exc}；继续二维动态演示。")
+        return False
+    finally:
+        if not log_file.closed:
+            log_file.close()
+    print(STATIC_3D_TITLE)
+    print("已打开独立窗口；关闭该窗口后将继续二维动态演示。")
+    try:
+        while process.poll() is None:
+            sleep(0.2)
+    except KeyboardInterrupt:
+        _stop_static_preview(process)
+        raise
+    exit_code = process.returncode
+    if exit_code not in {0, None}:
+        try:
+            tail = log_path.read_text(encoding="utf-8", errors="replace").splitlines()[-6:]
+        except OSError:
+            tail = []
+        suffix = f" 日志摘要：{' | '.join(tail)}" if tail else ""
+        print(f"三维静态住宅预览退出（code {exit_code}），继续二维动态演示。{suffix}")
+        return False
+    return True
+
+
+def optional_static_preview(*, non_interactive: bool, input_fn: Any = input) -> bool:
+    """Offer the optional first presentation step without affecting GIF exports."""
+    if non_interactive:
+        return True
+    print("步骤 0：三维住宅静态预览（可选）")
+    print("该窗口仅展示 house_v1 的三维住宅布局，不运行机器人、控制器或 Nav2。")
+    try:
+        choice = input_fn("[Enter] 打开三维静态住宅  [s] 跳过，直接进入二维动态演示  [q] 退出：").strip().casefold()
+    except EOFError:
+        choice = "s"
+    if choice == "q":
+        return False
+    if choice == "s":
+        return True
+    launch_static_preview()
+    return True
 
 
 @dataclass(frozen=True)
@@ -420,6 +519,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--export-gif", action="store_true", help="额外生成会议备用 GIF")
     args = parser.parse_args(argv)
     try:
+        if not optional_static_preview(non_interactive=args.non_interactive):
+            print("演示已安全退出。")
+            return 0
         inputs = load_house_v1_inputs()
         demo = build_visual_demo(args.text, inputs)
         output_dir = Path(tempfile.mkdtemp(prefix="house-v1-visual-demo-"))

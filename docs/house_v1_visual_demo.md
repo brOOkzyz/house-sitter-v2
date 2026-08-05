@@ -6,9 +6,20 @@
 python3 scripts/run_house_v1_visual_demo.py
 ```
 
-这是 **2D deterministic residential simulation visualization**。它完全在本地读取
+二维流程是 **2D deterministic residential simulation visualization**。它完全在本地读取
 `maps/house_v1.*`、`local_annotations/house_v1/semantic_regions.json` 和
-`local_annotations/house_v1/safe_goals.json`，不会启动或连接 ROS、Gazebo、Nav2 或 RViz。
+`local_annotations/house_v1/safe_goals.json`，不会启动或连接 ROS、Nav2 或 RViz。
+
+## 可选三维住宅静态预览
+
+交互演示开始时，步骤 0 会提供“打开三维静态住宅”的选项。它独立运行
+`scripts/preview_house_v1_3d.sh`，只以 Gazebo GUI 加载本地 `worlds/house_v1.sdf`，用于
+查看墙体、房间和家具。窗口明确标注 **Static 3D residential preview — no robot execution**；
+它不会生成机器人、启动控制器或导航组件，也不会发送任何运动或导航请求。关闭该窗口后会回到
+二维演示。
+
+若 `gz` 不存在或静态预览启动失败，程序会显示简短中文提示并直接继续二维流程，不显示 traceback。
+`--non-interactive` 和 `--export-gif` 会自动跳过这一步，因此备用 GIF 仍完全不依赖 Gazebo。
 
 ## 演示流程
 

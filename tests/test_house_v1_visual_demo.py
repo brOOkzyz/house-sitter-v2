@@ -7,11 +7,14 @@ import os
 import sys
 import tempfile
 import unittest
+from io import StringIO
 from pathlib import Path
+from unittest import mock
 
 os.environ.setdefault("MPLBACKEND", "Agg")
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "scripts" / "run_house_v1_visual_demo.py"
+STATIC_PREVIEW = ROOT / "scripts" / "preview_house_v1_3d.sh"
 SPEC = importlib.util.spec_from_file_location("house_v1_visual_demo", SCRIPT)
 assert SPEC and SPEC.loader
 visual = importlib.util.module_from_spec(SPEC)
@@ -81,10 +84,59 @@ class HouseV1VisualDemoTests(unittest.TestCase):
             self.assertFalse(result["gazebo_nav2_execution"])
             self.assertTrue(paths["final_frame.png"].is_file())
 
-    def test_script_has_no_ros_gazebo_or_nav2_command_dependency(self):
+    def test_2d_path_has_no_ros_gazebo_or_nav2_command_dependency(self):
         source = SCRIPT.read_text(encoding="utf-8")
-        for prohibited in ("subprocess", "ros2 ", "gz ", "NavigateToPose", "cmd_vel"):
+        for prohibited in ("ros2 ", "NavigateToPose", "cmd_vel"):
             self.assertNotIn(prohibited, source)
+
+    def test_static_preview_script_only_loads_local_world_without_robot_or_navigation(self):
+        source = STATIC_PREVIEW.read_text(encoding="utf-8").casefold()
+        self.assertIn('gz sim "${world_file}"', source)
+        self.assertIn("house_v1.sdf", source)
+        for prohibited in ("turtlebot", "ros2", "controller_manager", "nav2", "navigatetopose", "cmd_vel"):
+            self.assertNotIn(prohibited, source)
+
+    def test_preview_menu_can_skip_or_quit_without_starting_a_child(self):
+        with mock.patch.object(visual, "launch_static_preview") as launch:
+            self.assertTrue(visual.optional_static_preview(non_interactive=False, input_fn=lambda _: "s"))
+            self.assertFalse(visual.optional_static_preview(non_interactive=False, input_fn=lambda _: "q"))
+        launch.assert_not_called()
+
+    def test_preview_menu_can_open_a_static_child_then_continue(self):
+        with mock.patch.object(visual, "launch_static_preview", return_value=True) as launch:
+            self.assertTrue(visual.optional_static_preview(non_interactive=False, input_fn=lambda _: ""))
+        launch.assert_called_once_with()
+
+    def test_missing_gazebo_falls_back_to_the_2d_demo(self):
+        ready, message = visual.static_preview_ready(ROOT, find_command=lambda _: None)
+        self.assertFalse(ready)
+        self.assertIn("跳过三维静态住宅预览", message)
+
+    def test_preview_process_failure_has_no_traceback_and_uses_own_process_group(self):
+        class FailedProcess:
+            returncode = 7
+            pid = 4321
+
+            def poll(self):
+                return 7
+
+        calls: list[tuple[tuple[object, ...], dict[str, object]]] = []
+
+        def fake_popen(*args, **kwargs):
+            calls.append((args, kwargs))
+            return FailedProcess()
+
+        with mock.patch.object(visual, "static_preview_ready", return_value=(True, "")), mock.patch("sys.stdout", new_callable=StringIO) as output:
+            self.assertFalse(visual.launch_static_preview(root=ROOT, popen=fake_popen))
+        self.assertTrue(calls[0][1]["start_new_session"])
+        self.assertIn("preview_house_v1_3d.sh", str(calls[0][0][0]))
+        self.assertIn("继续二维动态演示", output.getvalue())
+        self.assertNotIn("Traceback", output.getvalue())
+
+    def test_non_interactive_mode_does_not_offer_or_start_static_preview(self):
+        with mock.patch.object(visual, "launch_static_preview") as launch:
+            self.assertTrue(visual.optional_static_preview(non_interactive=True))
+        launch.assert_not_called()
 
     def test_planning_output_is_hash_seed_deterministic(self):
         first = visual.build_visual_demo("检查厨房", self.inputs)
