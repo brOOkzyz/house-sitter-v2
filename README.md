@@ -187,6 +187,19 @@ Each preview or run publishes exactly `skill_request.json`, `skill_plan.json`, `
 
 **This project is simulation-only and does not support real-robot deployment.**
 
+### Offline natural-language skill requests
+
+`scripts/parse_skill_request.py` is an offline deterministic Chinese/English adapter for a small reviewed vocabulary: `patrol_home`, `check_all_rooms`, `inspect_area`, `go_to_safe_waiting_area`, `return_to_charger`, `pause_current_task`, `resume_current_task`, and `cancel_current_task`. It maps supported region aliases to canonical parameters, creates only existing `SkillRequest` structures, and can optionally run the existing planner as a read-only validation step. Ambiguous, conflicting, incomplete, unsupported, physical-device, or real-robot requests fail closed; it never emits coordinates, sends goals, starts ROS, or executes a skill.
+
+```bash
+python3 scripts/parse_skill_request.py --text "检查厨房"
+python3 scripts/parse_skill_request.py --text "inspect kitchen" --validate-plan \
+  --semantic-regions local_annotations/semantic_regions.json \
+  --safe-goals local_annotations/accepted_safe_goals.json
+```
+
+The current adapter has no LLM, API, or network dependency. A future LLM provider may select only this reviewed capability/parameter vocabulary; it must never generate coordinates or directly control a robot.
+
 ### Execution evaluation
 
 `scripts/evaluate_skill_execution.py` reads one or more completed Gazebo/Nav2 execution artifact directories offline and atomically writes `execution_trials.csv`, `execution_summary.json`, and `execution_summary.md`. It reports trial status, sent-goal count, per-step normalized navigation-time feedback where available, aggregate known duration, feedback and recovery counts, timeout policy, effective timeout, basis, and terminal reason. Inputs must retain explicit simulation-only/review-only/no-real-robot flags and internally consistent request/plan/result identities; malformed or incomplete inputs fail closed without partial output. This supports reproducible quantitative simulation evaluation for the project or a paper and never starts ROS, Gazebo, Nav2, or a robot command path.
