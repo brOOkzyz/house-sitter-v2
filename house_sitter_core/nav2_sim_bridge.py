@@ -10,7 +10,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 import math
 import time
-from typing import Any
+from typing import Any, Callable
 
 
 NAVIGATION_STATUSES = frozenset({"succeeded", "failed", "cancelled", "timed_out"})
@@ -107,7 +107,13 @@ class FakeNavigationExecutor(NavigationExecutor):
 class Nav2SimulationExecutor(NavigationExecutor):
     """Lazy ROS 2/Nav2 action client for an already-running Gazebo simulation."""
 
-    def __init__(self, node: Any, *, action_name: str = "navigate_to_pose") -> None:
+    def __init__(
+        self,
+        node: Any,
+        *,
+        action_name: str = "navigate_to_pose",
+        feedback_observer: Callable[[dict[str, Any]], None] | None = None,
+    ) -> None:
         try:
             from rclpy.action import ActionClient
             from nav2_msgs.action import NavigateToPose
@@ -120,6 +126,7 @@ class Nav2SimulationExecutor(NavigationExecutor):
         self._client = ActionClient(node, NavigateToPose, action_name)
         self._navigate_type = NavigateToPose
         self._feedback_by_handle: dict[int, list[dict[str, Any]]] = {}
+        self._feedback_observer = feedback_observer
 
     @staticmethod
     def _normalize_feedback(message: Any) -> dict[str, Any]:
@@ -151,7 +158,10 @@ class Nav2SimulationExecutor(NavigationExecutor):
         feedback: list[dict[str, Any]] = []
 
         def feedback_callback(feedback_message: Any) -> None:
-            feedback.append(self._normalize_feedback(feedback_message))
+            normalized = self._normalize_feedback(feedback_message)
+            feedback.append(normalized)
+            if self._feedback_observer is not None:
+                self._feedback_observer(dict(normalized))
 
         future = self._client.send_goal_async(message, feedback_callback=feedback_callback)
         import rclpy  # Delayed for the same reason as the constructor imports.

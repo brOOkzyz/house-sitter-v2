@@ -40,6 +40,34 @@ def run_natural_language_pipeline(
     timeout_seconds: float | None = None,
 ) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any], dict[str, Any]]:
     """Parse, plan, and optionally execute only through the existing simulation bridge."""
+    request, parsed, plan, result, _, _ = run_natural_language_pipeline_detailed(
+        text,
+        regions_document,
+        goals_document,
+        executor=executor,
+        execute_simulation=execute_simulation,
+        timeout_seconds=timeout_seconds,
+    )
+    return request, parsed, plan, result
+
+
+def run_natural_language_pipeline_detailed(
+    text: str,
+    regions_document: dict[str, Any],
+    goals_document: dict[str, Any],
+    *,
+    executor: NavigationExecutor | None = None,
+    execute_simulation: bool = False,
+    timeout_seconds: float | None = None,
+) -> tuple[
+    dict[str, Any], dict[str, Any], dict[str, Any], dict[str, Any], dict[str, Any] | None, list[dict[str, Any]],
+]:
+    """Run the existing pipeline and also expose bridge records for optional evaluation.
+
+    The original four-item API remains unchanged.  The extra return values are
+    deliberately the already-produced execution result and events, rather than
+    a second execution pass or an alternative navigation path.
+    """
     if timeout_seconds is not None and (not math.isfinite(timeout_seconds) or timeout_seconds <= 0):
         raise NaturalLanguagePipelineError("timeout_seconds must be a finite positive number.")
     if execute_simulation and executor is None:
@@ -53,7 +81,7 @@ def run_natural_language_pipeline(
             "planner_status": "not_started", "execution_mode": "not_started", "action_goals_sent": 0,
             "final_status": parsed["status"], "explanation": parsed["explanation"], **_flags(),
         }
-        return request_document, parsed, plan, result
+        return request_document, parsed, plan, result, None, []
     capability, parameters = parsed["selected_capability"], parsed["parameters"]
     if not isinstance(capability, str) or not isinstance(parameters, dict):
         raise NaturalLanguagePipelineError("accepted natural-language parse is malformed.")
@@ -87,7 +115,7 @@ def run_natural_language_pipeline(
         },
         **_flags(),
     }
-    return {**request.as_dict(), **_flags()}, parsed, plan, result
+    return {**request.as_dict(), **_flags()}, parsed, plan, result, execution, events
 
 
 def render_pipeline_artifacts(
