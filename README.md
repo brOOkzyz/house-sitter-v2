@@ -187,6 +187,17 @@ Each preview or run publishes exactly `skill_request.json`, `skill_plan.json`, `
 
 **This project is simulation-only and does not support real-robot deployment.**
 
+### Execution evaluation
+
+`scripts/evaluate_skill_execution.py` reads one or more completed Gazebo/Nav2 execution artifact directories offline and atomically writes `execution_trials.csv`, `execution_summary.json`, and `execution_summary.md`. It reports trial status, sent-goal count, per-step normalized navigation-time feedback where available, aggregate known duration, feedback and recovery counts, timeout policy, effective timeout, basis, and terminal reason. Inputs must retain explicit simulation-only/review-only/no-real-robot flags and internally consistent request/plan/result identities; malformed or incomplete inputs fail closed without partial output. This supports reproducible quantitative simulation evaluation for the project or a paper and never starts ROS, Gazebo, Nav2, or a robot command path.
+
+```bash
+python3 scripts/evaluate_skill_execution.py \
+  local_annotations/execution_run_001 \
+  local_annotations/execution_run_002 \
+  --output-dir local_annotations/execution_evaluation_001
+```
+
 ### Static Gazebo Sim visualization
 
 The first 3D visualization prototype is a separate static, simulation-only view. It reads the existing synthetic region and accepted safe-goal artifacts, materializes the installed TurtleBot4 Jazzy standard Xacro as a static model, and generates a small independent SDF world with colored region edges and goal markers. It does not use the system warehouse world, does not start ROS/Nav2/RViz, and sends no robot commands.
