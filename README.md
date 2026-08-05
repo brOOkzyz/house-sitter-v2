@@ -200,6 +200,10 @@ python3 scripts/parse_skill_request.py --text "inspect kitchen" --validate-plan 
 
 The current adapter has no LLM, API, or network dependency. A future LLM provider may select only this reviewed capability/parameter vocabulary; it must never generate coordinates or directly control a robot.
 
+### Natural-language simulation pipeline
+
+`scripts/run_natural_language_skill.py` composes the offline adapter, existing planner, and existing simulation execution bridge into one entry point. It writes `natural_language_request.json`, `natural_language_parse.json`, `skill_plan.json`, `pipeline_result.json`, and `pipeline_report.md` atomically. Default and `--dry-run` execution remain ROS-free and send zero action goals. Only explicit `--execute-simulation` may connect to an already-running Gazebo/Nav2 system, after the same local parse and planner preflight succeeds; navigation targets remain planner-retained accepted safe goals. The natural-language layer never creates coordinates or directly controls a robot.
+
 ### Execution evaluation
 
 `scripts/evaluate_skill_execution.py` reads one or more completed Gazebo/Nav2 execution artifact directories offline and atomically writes `execution_trials.csv`, `execution_summary.json`, and `execution_summary.md`. It reports trial status, sent-goal count, per-step normalized navigation-time feedback where available, aggregate known duration, feedback and recovery counts, timeout policy, effective timeout, basis, and terminal reason. Inputs must retain explicit simulation-only/review-only/no-real-robot flags and internally consistent request/plan/result identities; malformed or incomplete inputs fail closed without partial output. This supports reproducible quantitative simulation evaluation for the project or a paper and never starts ROS, Gazebo, Nav2, or a robot command path.

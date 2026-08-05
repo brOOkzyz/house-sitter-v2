@@ -21,3 +21,7 @@ python3 scripts/parse_skill_request.py --text "resume task checkpoint-001"
 ```
 
 This project is simulation-only and does not support real-robot deployment. The current adapter uses no LLM, API, clock, random value, or network service. A future LLM provider may only choose from the reviewed capability and parameter vocabulary before the same catalog and planner validation; it must never generate coordinates or directly control a robot.
+
+## Unified simulation pipeline
+
+`scripts/run_natural_language_skill.py` connects this adapter to the existing planner and optional simulation execution bridge. It writes a single atomic directory containing `natural_language_request.json`, `natural_language_parse.json`, `skill_plan.json`, `pipeline_result.json`, and `pipeline_report.md`. Default operation and `--dry-run` are ROS-free and send zero action goals. Only explicit `--execute-simulation` can connect to an already-running Gazebo Sim/Nav2 environment, after the same parse and planner preflight has accepted the request. The pipeline does not add any coordinate generation or device-control path: navigation can use only planner-approved accepted safe-goal references.
