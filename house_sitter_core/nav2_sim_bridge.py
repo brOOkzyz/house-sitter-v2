@@ -113,6 +113,7 @@ class Nav2SimulationExecutor(NavigationExecutor):
         *,
         action_name: str = "navigate_to_pose",
         feedback_observer: Callable[[dict[str, Any]], None] | None = None,
+        cancel_after_feedback: bool = False,
     ) -> None:
         try:
             from rclpy.action import ActionClient
@@ -127,6 +128,7 @@ class Nav2SimulationExecutor(NavigationExecutor):
         self._navigate_type = NavigateToPose
         self._feedback_by_handle: dict[int, list[dict[str, Any]]] = {}
         self._feedback_observer = feedback_observer
+        self._cancel_after_feedback = cancel_after_feedback
 
     @staticmethod
     def _normalize_feedback(message: Any) -> dict[str, Any]:
@@ -182,6 +184,10 @@ class Nav2SimulationExecutor(NavigationExecutor):
             while not future.done():
                 rclpy.spin_until_future_complete(self._node, future, timeout_sec=min(1.0, effective_timeout))
                 effective_timeout, basis = adaptive_timeout_from_feedback(feedback_list, effective_timeout, basis)
+                if self._cancel_after_feedback and feedback_list:
+                    self.cancel_goal(handle)
+                    feedback = tuple(self._feedback_by_handle.pop(id(handle), ()))
+                    return NavigationOutcome("cancelled", feedback, "cancelled_after_first_feedback", effective_timeout, basis)
                 if time.monotonic() - started >= effective_timeout:
                     break
         else:
