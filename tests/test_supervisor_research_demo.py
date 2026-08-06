@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import re
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -31,8 +33,8 @@ class SupervisorResearchDemoTests(unittest.TestCase):
     def test_root_and_thirteen_ordered_steps_are_independent_of_cwd(self):
         self.assertEqual(demo_module.locate_repo(SCRIPT), ROOT)
         self.assertEqual(len(demo_module.STEPS), 13)
-        self.assertEqual(demo_module.STEPS[0], "环境预检")
-        self.assertEqual(demo_module.STEPS[-1], "结束总结")
+        self.assertEqual(demo_module.STEPS[0], "Pre-flight Check")
+        self.assertEqual(demo_module.STEPS[-1], "Final Summary")
 
     def test_menu_supports_continue_skip_retry_and_quit(self):
         for response, expected in (("", "c"), ("s", "s"), ("r", "r"), ("q", "q")):
@@ -81,6 +83,31 @@ class SupervisorResearchDemoTests(unittest.TestCase):
         source = SCRIPT.read_text(encoding="utf-8")
         for forbidden in ("Suggested explanation", "Speaker notes", "Recommended script", "AI-generated explanation", "requests", "urllib", "llm_provider"):
             self.assertNotIn(forbidden, source)
+
+    def test_public_cli_output_is_english_only(self):
+        han = re.compile(r"[\u3400-\u4dbf\u4e00-\u9fff]")
+        for command in ([sys.executable, str(SCRIPT), "--help"], [sys.executable, str(SCRIPT), "--list-steps"]):
+            result = subprocess.run(command, cwd=ROOT, text=True, capture_output=True, check=False)
+            self.assertEqual(result.returncode, 0)
+            self.assertIsNone(han.search(result.stdout + result.stderr))
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "demo"
+            result = subprocess.run([sys.executable, str(SCRIPT), "--non-interactive", "--skip-3d", "--skip-2d",
+                                     "--paper-results-dir", "/tmp/house_sitter_paper_results_final", "--output-dir", str(output)],
+                                    cwd=ROOT, text=True, capture_output=True, check=False)
+            self.assertEqual(result.returncode, 0)
+            self.assertIsNone(han.search(result.stdout + result.stderr))
+            self.assertIn("Patrol order:", result.stdout)
+            self.assertIn("Changed room:", result.stdout)
+            self.assertIn("Generated artefacts are available at:", result.stdout)
+
+    def test_menu_and_step_labels_are_english(self):
+        instance = demo_module.ResearchDemo(args(), input_func=lambda _: "")
+        with mock.patch("builtins.print") as printed:
+            instance.menu(optional=True)
+        self.assertIn("Pre-flight Check", demo_module.STEPS)
+        source = SCRIPT.read_text(encoding="utf-8")
+        self.assertNotRegex(source, r"[\u3400-\u4dbf\u4e00-\u9fff]")
 
 
 if __name__ == "__main__":
