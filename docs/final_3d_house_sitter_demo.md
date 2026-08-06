@@ -38,6 +38,20 @@ Gazebo world loading, TurtleBot4 spawning, and the minimal clock bridge are real
 
 The command owns and cleans up only the process groups it starts. It never uses `pkill`, `killall`, global entity deletion, or a real-robot command path. The red obstacle entity has a per-run name and can only be removed by that exact name.
 
+## Phase 1E control readiness and motion smoke test
+
+`stop_motor` is an optional TurtleBot4 HMI power client path, not the required house_v1 simulated chassis interface. The observed warning is emitted by `turtlebot4_node`; the local Create 3 simulation motion provider is `motion_control`, which exposes `/robot_power` (`irobot_create_msgs/srv/RobotPower`) and `/e_stop` (`irobot_create_msgs/srv/EStop`) and publishes `geometry_msgs/msg/TwistStamped` to `/diffdrive_controller/cmd_vel`. The TurtleBot4 ROS--Gazebo bridge maps the real command input `/cmd_vel` (`geometry_msgs/msg/TwistStamped`) to `/model/turtlebot4/cmd_vel`.
+
+Control readiness requires the robot state publisher (or joint states), `/clock`, `/tf`, `/tf_static`, `/odom`, `/cmd_vel`, `/diffdrive_controller/cmd_vel`, the Gazebo chassis command topic, `/robot_power`, and `/e_stop`. A missing optional `stop_motor` HMI path is recorded, but does not relabel a working simulated chassis as unavailable. The full kitchen demonstration remains fail-closed until the required control interfaces and later Nav2 checks pass.
+
+For a bounded developer smoke test, choose `7. Run a short motion test` or run:
+
+```bash
+python3 scripts/run_final_3d_house_sitter_demo.py --motion-test
+```
+
+The test publishes `TwistStamped` at `0.05 m/s` for one second, publishes zero velocity in every completion path, verifies odometry displacement, and keeps the preview open afterwards. It does not start Nav2 or any monitoring, anomaly, Digital Twin, or alert workflow. The run writes `control_preflight.json`, `control_interfaces.json`, and `motion_test.json` alongside the preview artifacts.
+
 ## Artifacts
 
 Each preview writes `preflight_check.json`, `runtime_commands.json`, `house_startup.json`, `robot_spawn.json`, `cleanup.json`, `demo_summary.json`, and `logs/` under the requested new output directory. Entity records distinguish the creation acknowledgement from the optional query through `entity_verification_method`, `entity_query_confirmed`, and `entity_query_timed_out`. Failed stages retain their real false or failure state. The report must not be interpreted as physical-robot, physical-sensor, or real-home validation.

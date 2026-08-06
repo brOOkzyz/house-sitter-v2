@@ -18,7 +18,9 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from house_sitter_core.final_3d_demo import (  # noqa: E402
-    FinalDemoError, SafeGoal, SCENARIO_ID, kitchen_obstacle_spec, make_observation, preflight, run_demo, safe_goals,
+    FinalDemoError, SafeGoal, SCENARIO_ID, displacement_between, extract_gazebo_model_pose,
+    kitchen_obstacle_spec, make_observation, parse_ros_topic_list_types, qos_settings_from_endpoint,
+    preflight, run_demo, safe_goals, select_odometry_interface,
 )
 from house_sitter_core.nav2_sim_bridge import NavigationOutcome  # noqa: E402
 
@@ -40,7 +42,7 @@ class FakeRuntime:
         self.outcomes = list(outcomes); self.started = False; self.closed = False; self.goals = []; self.deleted = []
 
     def start(self, **kwargs): self.started = True
-    def ready(self, timeout_seconds): return {name: True for name in ("/clock", "/scan", "/odom", "/tf", "/tf_static", "/map", "/amcl_pose", "/navigate_to_pose", "/stop_motor")}
+    def ready(self, timeout_seconds): return {name: True for name in ("/clock", "/scan", "/odom", "/tf", "/tf_static", "/map", "/amcl_pose", "/navigate_to_pose", "/robot_power", "/e_stop")}
     def navigate(self, goal, timeout_seconds):
         self.goals.append(goal); return {"goal": {"label": goal.label}, "result": self.outcomes.pop(0), "final_pose": {"x": goal.x, "y": goal.y}}
     def spawn_obstacle(self, obstacle): return {"entity_name": obstacle.entity_name, "pose": {"x": obstacle.x, "y": obstacle.y, "z": obstacle.z}, "success": True}
@@ -62,9 +64,93 @@ class FakePreviewRuntime:
         return {"house_world_started": True, "house_world_ready": self.ready, "robot_spawn_requested": True, "robot_spawned": self.spawned, "robot_entity_spawned": self.spawned, **verification, "robot_simulation_interfaces_ready": self.control_ready, "robot_control_stack_ready": self.control_ready, "stop_motor_service_ready": self.control_ready, "control_readiness_warnings": [] if self.control_ready else ["Service stop_motor unavailable."], "preview_available": self.ready and self.spawned, "navigation_available": self.control_ready, "robot_spawn": robot_spawn, "charging_area_pose": {"x": goal.x, "y": goal.y, "yaw": goal.yaw, "z": 0.05, "source": goal.reference["proposal_id"]}}
     def shutdown(self): self.closed = True; return []
     def wait_for_house_close(self): return None
+    def run_motion_smoke_test(self):
+        self.motion_called = getattr(self, "motion_called", 0) + 1
+        return {"attempted": True, "requested_topic": "/cmd_vel", "resolved_command_topic": "/cmd_vel", "command_message_type": "geometry_msgs/msg/TwistStamped", "speed": 0.05, "duration": 1.0, "command_publish_count": 20, "zero_velocity_publish_count": 4, "control_command_published": True, "zero_velocity_sent": True, "initial_odom": {"x": 5.35, "y": 3.1}, "final_odom": {"x": 5.41, "y": 3.1}, "initial_gazebo_pose": None, "final_gazebo_pose": None, "odometry_received": True, "gazebo_pose_received": False, "displacement": 0.06, "movement_threshold": 0.01, "displacement_verified": True, "stop_verified": True, "robot_moved": True, "robot_stopped": True, "verification_source": "ros_odometry", "dds_warnings": [], "success": True, "failure_reason": None}
+    def send_zero_velocity(self): self.safety_stops = getattr(self, "safety_stops", 0) + 1; return 4
 
 
 class Final3DDemoTests(unittest.TestCase):
+    def test_odom_resolution_uses_an_active_formal_source_not_a_dead_canonical_name(self):
+        topic_types = parse_ros_topic_list_types(
+            "/odom [nav_msgs/msg/Odometry]\n/sim_ground_truth_pose [nav_msgs/msg/Odometry]\n/robot/odom [nav_msgs/msg/Odometry]\n"
+        )
+        dead = "Type: nav_msgs/msg/Odometry\nPublisher count: 0\nSubscription count: 2\n"
+        active = """Type: nav_msgs/msg/Odometry
+Publisher count: 1
+Node name: pose_republisher_node
+Node namespace: /
+Endpoint type: PUBLISHER
+QoS profile:
+  Reliability: BEST_EFFORT
+  History (Depth): UNKNOWN
+  Durability: VOLATILE
+"""
+        resolution = select_odometry_interface(topic_types, {"/odom": dead, "/sim_ground_truth_pose": active, "/robot/odom": dead})
+        self.assertEqual(resolution["selected"]["topic"], "/sim_ground_truth_pose")
+        self.assertEqual(len(resolution["candidates"]), 3)
+
+    def test_qos_matches_best_effort_volatile_publisher_with_a_safe_unknown_history_default(self):
+        settings = qos_settings_from_endpoint({"reliability": "BEST_EFFORT", "durability": "VOLATILE", "history": "UNKNOWN"})
+        self.assertEqual(settings["reliability"], "BEST_EFFORT")
+        self.assertEqual(settings["durability"], "VOLATILE")
+        self.assertEqual(settings["history"], "KEEP_LAST")
+        self.assertEqual(settings["depth"], 10)
+        self.assertTrue(settings["history_fallback_used"])
+
+    def test_gazebo_pose_extraction_and_noise_threshold_are_not_synthetic_motion(self):
+        payload = '{"pose":[{"name":"wall","position":{"x":0,"y":0}},{"name":"turtlebot4","position":{"x":5.35,"y":3.1,"z":0.05}}]}'
+        self.assertEqual(extract_gazebo_model_pose(payload), {"x": 5.35, "y": 3.1, "z": 0.05})
+        self.assertLess(displacement_between({"x": 1.0, "y": 2.0}, {"x": 1.003, "y": 2.002}), 0.01)
+
+    def test_gazebo_pose_reader_is_world_scoped_bounded_and_never_sets_pose(self):
+        from house_sitter_core.final_3d_demo import Local3DRuntime
+        with tempfile.TemporaryDirectory() as directory:
+            runtime = Local3DRuntime(ROOT, Path(directory) / "runtime"); runtime.output_dir.mkdir(); runtime.log_dir.mkdir()
+            payload = '{"pose":[{"name":"turtlebot4","position":{"x":5.35,"y":3.1,"z":0.05}}]}'
+            with mock.patch.object(runtime, "_run", return_value=query_result(stdout=payload)) as run:
+                pose, topic = runtime._gazebo_pose_snapshot()
+            self.assertEqual(topic, "/world/house_v1/pose/info")
+            self.assertEqual(pose["x"], 5.35)
+            command = run.call_args.args[0]
+            self.assertIn("-n", command); self.assertIn("1", command)
+            self.assertNotIn("set_pose", " ".join(command))
+
+    def test_dds_raw_text_stays_in_logs_and_is_reduced_to_a_terminal_safe_summary(self):
+        from house_sitter_core.final_3d_demo import Local3DRuntime
+        with tempfile.TemporaryDirectory() as directory:
+            runtime = Local3DRuntime(ROOT, Path(directory) / "runtime"); runtime.output_dir.mkdir(); runtime.log_dir.mkdir()
+            raw = "RTPS_TRANSPORT_SHM Error Failed init_port fastdds_port123 open_and_lock_file failed\n"
+            (runtime.log_dir / "motion_verification.log").write_text(raw)
+            warnings = runtime._dds_warnings()
+            self.assertEqual(warnings[0]["summary"], "A DDS shared-memory transport warning was recorded.")
+            self.assertNotIn("fastdds_port", warnings[0]["summary"])
+            self.assertIn("fastdds_port", (runtime.log_dir / "motion_verification.log").read_text())
+
+    def test_motion_cli_falls_closed_but_keeps_preview_open_until_enter(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "preview"; output.mkdir(); (output / "logs").mkdir()
+            runtime = FakePreviewRuntime(control_ready=True)
+            runtime.run_motion_smoke_test = lambda: {**cli_module._empty_motion_record("Motion was commanded, but displacement could not be verified."), "attempted": True, "control_command_published": True, "zero_velocity_sent": True, "command_publish_count": 20, "zero_velocity_publish_count": 4}
+            result = {"summary": {"robot_control_stack_ready": True}, "runtime": runtime, "output_dir": output}
+            stream = io.StringIO()
+            with mock.patch.object(cli_module, "launch_house_preview", return_value=result), mock.patch("builtins.input", return_value="") as wait, redirect_stdout(stream):
+                self.assertEqual(cli_module._run_short_motion_test(cli_module.parse_args(["--motion-test"])), 2)
+            wait.assert_called_once()
+            self.assertIn("The Gazebo preview will remain open.", stream.getvalue())
+            record = json.loads((output / "motion_test.json").read_text())
+            self.assertFalse(record["success"])
+            self.assertTrue(record["control_command_published"])
+
+    def test_motion_cli_ctrl_c_publishes_an_additional_safety_stop(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "preview"; output.mkdir(); (output / "logs").mkdir()
+            runtime = FakePreviewRuntime(control_ready=True)
+            result = {"summary": {"robot_control_stack_ready": True}, "runtime": runtime, "output_dir": output}
+            with mock.patch.object(cli_module, "launch_house_preview", return_value=result), mock.patch("builtins.input", side_effect=KeyboardInterrupt):
+                self.assertEqual(cli_module._run_short_motion_test(cli_module.parse_args(["--motion-test"])), 0)
+            self.assertEqual(runtime.safety_stops, 1)
+
     def test_preflight_and_safe_goals_use_committed_house_v1_artifacts(self):
         check = preflight(ROOT); regions, goals = safe_goals(ROOT)
         self.assertEqual(goals["kitchen"].reference["canonical_label"], "kitchen")
@@ -121,6 +207,15 @@ class Final3DDemoTests(unittest.TestCase):
             result = subprocess.run([sys.executable, str(ROOT / "scripts" / "run_final_3d_house_sitter_demo.py"), "--scenario", SCENARIO_ID, "--dry-run", "--output-dir", str(Path(directory) / "result")], cwd=ROOT, text=True, capture_output=True, check=False)
             self.assertEqual(result.returncode, 0); self.assertIn("Dry-run completed.", result.stdout)
             self.assertNotRegex(result.stdout + result.stderr, r"[\u3400-\u4dbf\u4e00-\u9fff]")
+
+    def test_preview_dry_run_needs_no_menu_input_and_writes_control_artifacts(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "result"
+            result = subprocess.run([sys.executable, str(SCRIPT), "--dry-run", "--output-dir", str(output)], cwd=ROOT, text=True, capture_output=True, check=False)
+            self.assertEqual(result.returncode, 0)
+            self.assertIn("Dry-run completed.", result.stdout)
+            self.assertTrue((output / "control_preflight.json").is_file())
+            self.assertTrue((output / "control_interfaces.json").is_file())
 
     def test_source_avoids_frozen_experiment_edits_and_global_process_cleanup(self):
         source = (ROOT / "house_sitter_core" / "final_3d_demo.py").read_text(encoding="utf-8")
@@ -216,13 +311,13 @@ class Final3DDemoTests(unittest.TestCase):
             runtime.processes = [StartedProcess(process, "turtlebot4_spawn")]
             runtime.detected_entity_name = "turtlebot4"
             _, goals = safe_goals(ROOT)
-            with mock.patch.object(runtime, "wait_until_house_ready", return_value=True), mock.patch.object(runtime, "_run", side_effect=[query_result(stdout=""), query_result(stdout="/clock\n/scan\n/cmd_vel\n"), query_result(stdout="/model/turtlebot4/cmd_vel\n")]):
+            with mock.patch.object(runtime, "wait_until_house_ready", return_value=True), mock.patch.object(runtime, "_control_readiness", return_value={"robot_simulation_interfaces_ready": False, "stop_motor_service_ready": False, "robot_control_stack_ready": False, "control_topics": [], "control_services": [], "control_readiness_warnings": ["Optional TurtleBot4 HMI power service stop_motor is unavailable."]}):
                 record = runtime.spawn_diagnostics(goals["charging_area"])
             self.assertIsNone(record["first_error"])
             self.assertTrue(record["entity_creation_reported_success"])
             self.assertTrue(record["robot_entity_spawned"])
             self.assertFalse(record["robot_control_stack_ready"])
-            self.assertIn("Service stop_motor unavailable.", record["control_readiness_warnings"])
+            self.assertIn("Optional TurtleBot4 HMI power service stop_motor is unavailable.", record["control_readiness_warnings"])
             self.assertEqual(record["requested_entity_name"], "turtlebot4")
 
     def test_creation_acknowledgement_is_sufficient_when_the_auxiliary_query_is_unavailable(self):
@@ -237,7 +332,7 @@ class Final3DDemoTests(unittest.TestCase):
             runtime.entity_verification_method = "creation_acknowledgement"
             runtime.entity_query_timed_out = True
             runtime.entity_query_result = query_result(["gz", "service"], timed_out=True, exit_code=-15, error="timed out")
-            with mock.patch.object(runtime, "wait_until_house_ready", return_value=True), mock.patch.object(runtime, "_run", side_effect=[query_result(stdout=""), query_result(stdout="/clock\n/scan\n/cmd_vel\n"), query_result(stdout="/model/turtlebot4/cmd_vel\n")]):
+            with mock.patch.object(runtime, "wait_until_house_ready", return_value=True), mock.patch.object(runtime, "_control_readiness", return_value={"robot_simulation_interfaces_ready": False, "stop_motor_service_ready": False, "robot_control_stack_ready": False, "control_topics": [], "control_services": [], "control_readiness_warnings": []}):
                 record = runtime.spawn_diagnostics(goals["charging_area"])
             self.assertTrue(record["entity_creation_reported_success"])
             self.assertTrue(record["robot_entity_spawned"])
@@ -292,15 +387,89 @@ class Final3DDemoTests(unittest.TestCase):
         self.assertNotIn("Traceback", output.getvalue() + errors.getvalue())
         self.assertIn("timed out", errors.getvalue())
 
-    def test_full_demo_fails_closed_before_navigation_when_stop_motor_is_unavailable(self):
+    def test_full_demo_fails_closed_before_navigation_when_required_control_is_unavailable(self):
         class NoControlRuntime(FakeRuntime):
             def ready(self, timeout_seconds):
-                return {"/clock": True, "/scan": True, "/odom": True, "/tf": True, "/tf_static": True, "/map": True, "/amcl_pose": True, "/navigate_to_pose": True, "/stop_motor": False}
+                return {"/clock": True, "/scan": True, "/odom": True, "/tf": True, "/tf_static": True, "/map": True, "/amcl_pose": True, "/navigate_to_pose": True, "/robot_power": False, "/e_stop": True}
         with tempfile.TemporaryDirectory() as directory:
             runtime = NoControlRuntime()
             result = run_demo(ROOT, Path(directory) / "result", runtime=runtime, dry_run=False, headless=True, timeout_seconds=5)
             self.assertIn("control services are not ready", result["summary"]["failure_reason"])
             self.assertEqual(runtime.goals, [])
+
+    def test_control_readiness_uses_real_create3_services_not_optional_stop_motor(self):
+        from house_sitter_core.final_3d_demo import Local3DRuntime
+        with tempfile.TemporaryDirectory() as directory:
+            runtime = Local3DRuntime(ROOT, Path(directory) / "runtime"); runtime.output_dir.mkdir(); runtime.log_dir.mkdir()
+            def command_result_for(command, timeout):
+                key = " ".join(command)
+                if key == "ros2 topic list":
+                    return query_result(command, stdout="/clock\n/tf\n/tf_static\n/odom\n/cmd_vel\n/diffdrive_controller/cmd_vel\n/joint_states\n")
+                if key == "ros2 topic list -t":
+                    return query_result(command, stdout="/clock [rosgraph_msgs/msg/Clock]\n/tf [tf2_msgs/msg/TFMessage]\n/tf_static [tf2_msgs/msg/TFMessage]\n/odom [nav_msgs/msg/Odometry]\n/cmd_vel [geometry_msgs/msg/TwistStamped]\n/diffdrive_controller/cmd_vel [geometry_msgs/msg/TwistStamped]\n")
+                if key == "ros2 topic info /odom --verbose":
+                    return query_result(command, stdout="Type: nav_msgs/msg/Odometry\n\nPublisher count: 1\n\nNode name: pose_republisher_node\nEndpoint type: PUBLISHER\nQoS profile:\n  Reliability: BEST_EFFORT\n  History (Depth): KEEP_LAST (5)\n  Durability: VOLATILE\n")
+                if key == "gz topic -l":
+                    return query_result(command, stdout="/model/turtlebot4/cmd_vel\n")
+                if key == "ros2 service list":
+                    return query_result(command, stdout="/robot_power\n/e_stop\n")
+                if key == "ros2 node list":
+                    return query_result(command, stdout="/robot_state_publisher\n/motion_control\n")
+                if command[:3] == ["ros2", "service", "type"]:
+                    return query_result(command, stdout={"/robot_power": "irobot_create_msgs/srv/RobotPower", "/e_stop": "irobot_create_msgs/srv/EStop"}[command[-1]])
+                self.fail(f"unexpected command: {command}")
+            with mock.patch.object(runtime, "_run", side_effect=command_result_for):
+                result = runtime._control_readiness()
+            self.assertTrue(result["robot_simulation_interfaces_ready"])
+            self.assertTrue(result["robot_control_stack_ready"])
+            self.assertFalse(result["stop_motor_service_ready"])
+            self.assertEqual(result["missing_services"], [])
+            self.assertIn("/robot_power", result["control_services"])
+
+    def test_missing_required_create3_service_fails_control_readiness(self):
+        from house_sitter_core.final_3d_demo import Local3DRuntime
+        with tempfile.TemporaryDirectory() as directory:
+            runtime = Local3DRuntime(ROOT, Path(directory) / "runtime"); runtime.output_dir.mkdir(); runtime.log_dir.mkdir()
+            def command_result_for(command, timeout):
+                key = " ".join(command)
+                values = {
+                    "ros2 topic list": "/clock\n/tf\n/tf_static\n/odom\n/cmd_vel\n/diffdrive_controller/cmd_vel\n/joint_states\n",
+                    "ros2 topic list -t": "/odom [nav_msgs/msg/Odometry]\n/cmd_vel [geometry_msgs/msg/TwistStamped]\n/diffdrive_controller/cmd_vel [geometry_msgs/msg/TwistStamped]\n",
+                    "ros2 topic info /odom --verbose": "Type: nav_msgs/msg/Odometry\nPublisher count: 1\nNode name: pose_republisher_node\nEndpoint type: PUBLISHER\nQoS profile:\n  Reliability: BEST_EFFORT\n  History (Depth): KEEP_LAST (5)\n  Durability: VOLATILE\n",
+                    "gz topic -l": "/model/turtlebot4/cmd_vel\n",
+                    "ros2 service list": "/robot_power\n",
+                    "ros2 node list": "/robot_state_publisher\n",
+                    "ros2 service type /robot_power": "irobot_create_msgs/srv/RobotPower\n",
+                }
+                return query_result(command, stdout=values.get(key, ""))
+            with mock.patch.object(runtime, "_run", side_effect=command_result_for):
+                result = runtime._control_readiness()
+            self.assertFalse(result["robot_control_stack_ready"])
+            self.assertIn("/e_stop", result["missing_services"])
+
+    def test_motion_menu_runs_only_after_ready_and_records_zero_velocity(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "preview"; output.mkdir(); (output / "logs").mkdir()
+            runtime = FakePreviewRuntime(control_ready=True)
+            result = {"summary": {"robot_control_stack_ready": True}, "runtime": runtime, "output_dir": output}
+            arguments = cli_module.parse_args(["--motion-test"])
+            with mock.patch.object(cli_module, "launch_house_preview", return_value=result), mock.patch("builtins.input", return_value=""):
+                self.assertEqual(cli_module._run_short_motion_test(arguments), 0)
+            record = json.loads((output / "motion_test.json").read_text())
+            self.assertTrue(record["success"])
+            self.assertTrue(record["zero_velocity_sent"])
+            self.assertEqual(runtime.motion_called, 1)
+
+    def test_motion_menu_rejects_unready_control_without_commanding_motion(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "preview"; output.mkdir(); (output / "logs").mkdir()
+            runtime = FakePreviewRuntime(control_ready=False)
+            result = {"summary": {"robot_control_stack_ready": False}, "runtime": runtime, "output_dir": output}
+            arguments = cli_module.parse_args(["--motion-test"])
+            with mock.patch.object(cli_module, "launch_house_preview", return_value=result):
+                self.assertEqual(cli_module._run_short_motion_test(arguments), 2)
+            self.assertFalse(hasattr(runtime, "motion_called"))
+            self.assertTrue(json.loads((output / "motion_test.json").read_text())["zero_velocity_sent"] is False)
 
 
 if __name__ == "__main__":
