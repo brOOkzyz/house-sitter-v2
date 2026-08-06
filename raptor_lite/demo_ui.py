@@ -198,7 +198,7 @@ class DemoController:
             return {"name": name, "content": (self.artifact_dir / name).read_text(encoding="utf-8")}
 
 
-def _page() -> str:
+def _legacy_page_with_inline_handlers() -> str:
     return """<!doctype html><html><head><meta charset=\"utf-8\"><title>RaPToR-Lite House-Sitter Demo</title><style>
 body{font:14px system-ui,sans-serif;margin:0;background:#f4f6f8;color:#17212b}header{padding:14px 22px;background:#17324d;color:#fff}main{display:grid;grid-template-columns:1fr 1.1fr 1fr;gap:12px;padding:12px}section{background:#fff;border:1px solid #ccd5df;border-radius:8px;padding:12px;min-width:0}textarea,select,input,button{font:inherit;margin:4px 0;padding:7px}textarea{width:96%;height:95px}button{cursor:pointer}button:disabled{cursor:not-allowed;opacity:.45}pre{white-space:pre-wrap;overflow:auto;max-height:220px;background:#f6f8fa;padding:8px}.boundary{color:#f7d794;font-weight:700}.ok{color:#16733b}.bad{color:#b32424}.room{fill:#eaf1f7;stroke:#47657c;stroke-width:2}.event{fill:#ff5b5b}.robot{fill:#1b79d1;stroke:#0c395f;stroke-width:2}.route{fill:none;stroke:#37a867;stroke-width:5;stroke-linecap:round}.door{stroke:#7b5725;stroke-width:5}small{color:#536273}.row{display:flex;gap:6px;flex-wrap:wrap}@media(max-width:1000px){main{grid-template-columns:1fr}}</style></head><body><header><b>RaPToR-Lite House-Sitter Demo</b><span class=\"boundary\"> simulation-only — physical robot validation not performed</span></header><main>
 <section><h2>Task Creation</h2><textarea id=\"text\">Run a complete house-sitter patrol and report any environmental changes.</textarea><label>Seed <input id=\"seed\" type=number value=12345 min=0 max=2147483647></label><label>Scenario <select id=\"scenario\"><option value=\"complete\">Kitchen obstacle + bathroom humidity</option><option value=\"normal\">Normal</option><option value=\"dropout\">Observation dropout</option><option value=\"blocked\">Blocked transition</option><option value=\"low_battery\">Low battery</option></select></label><div class=\"row\"><button onclick=\"plan()\">Plan</button><button onclick=\"validate()\">Validate</button><button id=\"run\" onclick=\"run()\">Run</button><button onclick=\"demo()\">Run Complete House-Sitter Demo</button><button onclick=\"reset()\">Reset</button></div><h3>Planning Result</h3><pre id=\"planning\"></pre><h3>Verification</h3><pre id=\"verify\"></pre></section>
@@ -207,6 +207,140 @@ body{font:14px system-ui,sans-serif;margin:0;background:#f4f6f8;color:#17212b}he
 let state={};const $=id=>document.getElementById(id);const show=(id,v)=>$(id).textContent=JSON.stringify(v,null,2);async function api(path,body){const r=await fetch(path,{method:body?'POST':'GET',headers:{'Content-Type':'application/json'},body:body?JSON.stringify(body):undefined});const x=await r.json();if(!r.ok)throw Error(x.error);return x}function text(){return $('text').value}function seed(){return Number($('seed').value)}function scenario(){return $('scenario').value}async function plan(){try{render(await api('/api/plan',{text:text()}))}catch(e){alert(e.message)}}async function validate(){try{render(await api('/api/validate',{}))}catch(e){alert(e.message)}}async function run(){try{render(await api('/api/run',{seed:seed(),scenario:scenario()}))}catch(e){alert(e.message)}}async function demo(){try{render(await api('/api/demo',{seed:seed()}))}catch(e){alert(e.message)}}async function reset(){render(await api('/api/reset',{}))}async function play(action){try{render(await api('/api/playback',{action}))}catch(e){alert(e.message)}}async function tick(){if(state.playback&&!state.playback.paused)render(await api('/api/advance',{}))}setInterval(tick,350);
 function node(tag,attrs={},value){const n=document.createElementNS('http://www.w3.org/2000/svg',tag);Object.entries(attrs).forEach(([k,v])=>n.setAttribute(k,v));if(value)n.textContent=value;return n}function draw(s){const svg=$('map');svg.replaceChildren();const source=s.world?.rooms||{};const rooms={};Object.entries(source).forEach(([name,r])=>{const b=r.bounds;rooms[name]=[20+b[0]*57,20+(10-b[3])*40,(b[2]-b[0])*57,(b[3]-b[1])*40]});Object.entries(rooms).forEach(([name,a])=>{svg.append(node('rect',{x:a[0],y:a[1],width:a[2],height:a[3],class:'room'}));svg.append(node('text',{x:a[0]+10,y:a[1]+23},name.replace('_',' '))});const center=n=>{const a=rooms[n]||rooms.charging_area;return[a[0]+a[2]/2,a[1]+a[3]/2]};(s.world?.doors||[]).forEach(d=>{const a=center(d[0]),b=center(d[1]);svg.append(node('line',{x1:a[0],y1:a[1],x2:b[0],y2:b[1],class:'door'}))});const f=s.playback?.frame||{};(f.routes||[]).forEach(route=>{const p=route.map(r=>center(r).join(',')).join(' ');svg.append(node('polyline',{points:p,class:'route'}))});(f.events||[]).forEach(e=>{const c=center(e.room);svg.append(node('rect',{x:c[0]-12,y:c[1]-12,width:24,height:24,class:'event'}));svg.append(node('text',{x:c[0]-30,y:c[1]-20},e.type))});const c=center(f.current_room);svg.append(node('circle',{cx:c[0],cy:c[1],r:12,class:'robot'}));}
 function render(s){state=s;const p=s.planning||{};show('planning',{status:p.status,intent:p.detected_intent,rooms:p.extracted_rooms,checks:p.extracted_checks,automatic_safety:p.automatic_addition_reasons,warnings:p.warnings,clarification:p.clarification_questions,unsupported:p.unsupported_elements});show('verify',s.verification||{message:'Plan before validation'});show('task',p.candidate_task||{});show('caps',{resolved_capabilities:(s.verification||{}).resolved_capabilities,safety_summary:(s.verification||{}).safety_summary});const f=s.playback?.frame||{},done=s.playback&&s.playback.index===s.playback.total;show('status',{phase:s.phase,run:s.artifact_directory,playback:s.playback,room:f.current_room,battery:f.battery,time:f.simulation_time,stopped:f.stopped,execution_success:done?s.execution?.success:'replay_pending',first_failure:f.failure||(done?s.execution?.first_failure:null)});show('observations',f.observations||[]);show('alerts',{anomalies:f.anomalies||[],alerts:f.alerts||[]});show('twin',{baseline:s.digital_twin_before,current:s.digital_twin_current,updates:f.twin_updates||[]});$('report').textContent=f.report||'';$('run').disabled=!(s.verification&&s.verification.approved);const files=$('files');files.replaceChildren();(s.artifact_files||[]).forEach(name=>{const b=document.createElement('button');b.textContent=name;b.onclick=async()=>{$('file').textContent=(await api('/api/artifact?name='+encodeURIComponent(name))).content};files.append(b)});draw(s)}api('/api/state').then(render);</script></body></html>"""
+
+
+def _page() -> str:
+    """Return static markup; all application code is served as /app.js."""
+    return """<!doctype html>
+<html><head><meta charset="utf-8"><title>RaPToR-Lite House-Sitter Demo</title><style>
+body{font:14px system-ui,sans-serif;margin:0;background:#f4f6f8;color:#17212b}header{padding:14px 22px;background:#17324d;color:#fff}#app-status{margin:8px 12px;padding:8px;border-radius:5px;background:#e7f1fb;color:#17324d}#app-status[data-state=error]{background:#fde8e8;color:#8b1f1f}main{display:grid;grid-template-columns:1fr 1.1fr 1fr;gap:12px;padding:12px}section{background:#fff;border:1px solid #ccd5df;border-radius:8px;padding:12px;min-width:0}textarea,select,input,button{font:inherit;margin:4px 0;padding:7px}textarea{width:96%;height:95px}button{cursor:pointer}button:disabled{cursor:not-allowed;opacity:.45}pre{white-space:pre-wrap;overflow:auto;max-height:220px;background:#f6f8fa;padding:8px}.boundary{color:#f7d794;font-weight:700}.room{fill:#eaf1f7;stroke:#47657c;stroke-width:2}.event{fill:#ff5b5b}.robot{fill:#1b79d1;stroke:#0c395f;stroke-width:2}.route{fill:none;stroke:#37a867;stroke-width:5;stroke-linecap:round}.door{stroke:#7b5725;stroke-width:5}.row{display:flex;gap:6px;flex-wrap:wrap}@media(max-width:1000px){main{grid-template-columns:1fr}}</style></head>
+<body><header><b>RaPToR-Lite House-Sitter Demo</b><span class="boundary"> simulation-only — physical robot validation not performed</span></header>
+<div id="app-status" data-state="loading" role="status">Loading interface…</div>
+<main>
+<section><h2>Task Creation</h2><textarea id="text">Run a complete house-sitter patrol and report any environmental changes.</textarea><label>Seed <input id="seed" type="number" value="12345" min="0" max="2147483647"></label><label>Scenario <select id="scenario"><option value="complete">Kitchen obstacle + bathroom humidity</option><option value="normal">Normal</option><option value="dropout">Observation dropout</option><option value="blocked">Blocked transition</option><option value="low_battery">Low battery</option></select></label><div class="row"><button id="plan-button">Plan</button><button id="validate-button">Validate</button><button id="run-button" disabled>Run</button><button id="complete-button">Run Complete House-Sitter Demo</button><button id="reset-button">Reset</button></div><h3>Planning Result</h3><pre id="planning"></pre><h3>Verification</h3><pre id="verify"></pre></section>
+<section><h2>Household Simulation</h2><svg id="map" viewBox="0 0 620 480" width="100%" aria-label="House2D replay"></svg><div class="row"><button id="pause-button">Pause</button><button id="resume-button">Resume</button><button id="step-button">Step</button><button id="restart-button">Restart</button><button id="faster-button">Run faster</button></div><pre id="status"></pre><h3>Sensor Observations</h3><pre id="observations"></pre></section>
+<section><h2>System Evidence</h2><h3>Candidate Task</h3><pre id="task"></pre><h3>Capability Match</h3><pre id="caps"></pre><h3>Detected Anomalies / Alerts</h3><pre id="alerts"></pre><h3>Digital Twin Diff</h3><pre id="twin"></pre><h3>Monitoring Report</h3><pre id="report"></pre><h3>Artifacts</h3><div id="files"></div><pre id="file"></pre></section>
+</main>
+<script>window.raptorDemo={initialized:false,lastError:null};window.addEventListener("error",function(event){var status=document.getElementById("app-status");window.raptorDemo.lastError=event.message;status.textContent="JavaScript error: "+event.message;status.dataset.state="error";});</script>
+<script src="/app.js"></script></body></html>"""
+
+
+def _script() -> str:
+    """Return the static, parseable application script without user interpolation."""
+    return r"""(() => {
+  "use strict";
+  let state = {};
+  const app = window.raptorDemo;
+  const byId = (id) => document.getElementById(id);
+  const show = (id, value) => { byId(id).textContent = JSON.stringify(value, null, 2); };
+  const setStatus = (message, level = "ready") => {
+    const status = byId("app-status");
+    status.textContent = message;
+    status.dataset.state = level;
+  };
+  async function request(path, body) {
+    const response = await fetch(path, {
+      method: body ? "POST" : "GET",
+      headers: {"Content-Type": "application/json"},
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload.error || "The demo request failed.");
+    return payload;
+  }
+  const taskText = () => byId("text").value;
+  const seed = () => Number(byId("seed").value);
+  const scenario = () => byId("scenario").value;
+  async function perform(message, path, body, completed) {
+    setStatus(message);
+    try {
+      render(await request(path, body));
+      setStatus(completed);
+    } catch (error) {
+      app.lastError = error.message;
+      setStatus("Request failed: " + error.message, "error");
+    }
+  }
+  const plan = () => perform("Planning request…", "/api/plan", {text: taskText()}, "Plan is ready.");
+  const validate = () => perform("Validating candidate task…", "/api/validate", {}, "Verification is complete.");
+  const run = () => perform("Executing approved task…", "/api/run", {seed: seed(), scenario: scenario()}, "Execution trace is ready.");
+  const complete = () => perform("Preparing demonstration…", "/api/demo", {seed: seed()}, "Demonstration trace is ready.");
+  const reset = () => perform("Resetting demonstration…", "/api/reset", {}, "Demonstration has been reset.");
+  const playback = (action) => perform("Updating replay…", "/api/playback", {action}, "Replay updated.");
+  async function tick() {
+    if (!state.playback || state.playback.paused) return;
+    try { render(await request("/api/advance", {})); }
+    catch (error) { app.lastError = error.message; setStatus("Replay failed: " + error.message, "error"); }
+  }
+  function node(tag, attrs = {}, value = "") {
+    const item = document.createElementNS("http://www.w3.org/2000/svg", tag);
+    Object.entries(attrs).forEach(([key, value]) => item.setAttribute(key, value));
+    if (value) item.textContent = value;
+    return item;
+  }
+  function draw(snapshot) {
+    const svg = byId("map");
+    svg.replaceChildren();
+    const rooms = {};
+    Object.entries(snapshot.world?.rooms || {}).forEach(([name, room]) => {
+      const bounds = room.bounds;
+      rooms[name] = [20 + bounds[0] * 57, 20 + (10 - bounds[3]) * 40, (bounds[2] - bounds[0]) * 57, (bounds[3] - bounds[1]) * 40];
+    });
+    Object.entries(rooms).forEach(([name, area]) => {
+      svg.append(node("rect", {x: area[0], y: area[1], width: area[2], height: area[3], class: "room"}));
+      svg.append(node("text", {x: area[0] + 10, y: area[1] + 23}, name.replace("_", " ")));
+    });
+    const center = (name) => { const area = rooms[name] || rooms.charging_area; return [area[0] + area[2] / 2, area[1] + area[3] / 2]; };
+    (snapshot.world?.doors || []).forEach((door) => { const from = center(door[0]); const to = center(door[1]); svg.append(node("line", {x1: from[0], y1: from[1], x2: to[0], y2: to[1], class: "door"})); });
+    const frame = snapshot.playback?.frame || {};
+    (frame.routes || []).forEach((route) => svg.append(node("polyline", {points: route.map((room) => center(room).join(",")).join(" "), class: "route"})));
+    (frame.events || []).forEach((event) => { const point = center(event.room); svg.append(node("rect", {x: point[0] - 12, y: point[1] - 12, width: 24, height: 24, class: "event"})); svg.append(node("text", {x: point[0] - 30, y: point[1] - 20}, event.type)); });
+    const robot = center(frame.current_room);
+    svg.append(node("circle", {cx: robot[0], cy: robot[1], r: 12, class: "robot"}));
+  }
+  function render(snapshot) {
+    state = snapshot;
+    const planning = snapshot.planning || {};
+    show("planning", {status: planning.status, intent: planning.detected_intent, rooms: planning.extracted_rooms, checks: planning.extracted_checks, automatic_safety: planning.automatic_addition_reasons, warnings: planning.warnings, clarification: planning.clarification_questions, unsupported: planning.unsupported_elements});
+    show("verify", snapshot.verification || {message: "Plan before validation"});
+    show("task", planning.candidate_task || {});
+    show("caps", {resolved_capabilities: snapshot.verification?.resolved_capabilities, safety_summary: snapshot.verification?.safety_summary});
+    const frame = snapshot.playback?.frame || {};
+    const completeReplay = snapshot.playback && snapshot.playback.index === snapshot.playback.total;
+    show("status", {phase: snapshot.phase, run: snapshot.artifact_directory, playback: snapshot.playback, room: frame.current_room, battery: frame.battery, time: frame.simulation_time, stopped: frame.stopped, execution_success: completeReplay ? snapshot.execution?.success : "replay_pending", first_failure: frame.failure || (completeReplay ? snapshot.execution?.first_failure : null)});
+    show("observations", frame.observations || []);
+    show("alerts", {anomalies: frame.anomalies || [], alerts: frame.alerts || []});
+    show("twin", {baseline: snapshot.digital_twin_before, current: snapshot.digital_twin_current, updates: frame.twin_updates || []});
+    byId("report").textContent = frame.report || "";
+    byId("run-button").disabled = !(snapshot.verification && snapshot.verification.approved);
+    const files = byId("files");
+    files.replaceChildren();
+    (snapshot.artifact_files || []).forEach((name) => {
+      const button = document.createElement("button");
+      button.textContent = name;
+      button.addEventListener("click", async () => {
+        try { byId("file").textContent = (await request("/api/artifact?name=" + encodeURIComponent(name))).content; }
+        catch (error) { app.lastError = error.message; setStatus("Artifact loading failed: " + error.message, "error"); }
+      });
+      files.append(button);
+    });
+    draw(snapshot);
+  }
+  byId("plan-button").addEventListener("click", plan);
+  byId("validate-button").addEventListener("click", validate);
+  byId("run-button").addEventListener("click", run);
+  byId("complete-button").addEventListener("click", complete);
+  byId("reset-button").addEventListener("click", reset);
+  byId("pause-button").addEventListener("click", () => playback("pause"));
+  byId("resume-button").addEventListener("click", () => playback("resume"));
+  byId("step-button").addEventListener("click", () => playback("step"));
+  byId("restart-button").addEventListener("click", () => playback("restart"));
+  byId("faster-button").addEventListener("click", () => playback("faster"));
+  app.initialized = true;
+  setStatus("Ready. Create or select a task.");
+  request("/api/state").then(render).catch((error) => { app.lastError = error.message; setStatus("Initialisation failed: " + error.message, "error"); });
+  window.setInterval(tick, 350);
+})();"""
 
 
 def make_server(controller: DemoController, host: str = "127.0.0.1", port: int = 8765) -> ThreadingHTTPServer:
@@ -232,6 +366,8 @@ def make_server(controller: DemoController, host: str = "127.0.0.1", port: int =
             parsed = urlparse(self.path)
             try:
                 if parsed.path == "/": self._send(HTTPStatus.OK, _page(), "text/html; charset=utf-8")
+                elif parsed.path == "/app.js": self._send(HTTPStatus.OK, _script(), "application/javascript; charset=utf-8")
+                elif parsed.path == "/favicon.ico": self._send(HTTPStatus.NO_CONTENT, "", "image/x-icon")
                 elif parsed.path == "/api/health": self._send(HTTPStatus.OK, {"ok": True, "localhost_only": True, "simulation_only": True})
                 elif parsed.path == "/api/state": self._send(HTTPStatus.OK, controller.state())
                 elif parsed.path == "/api/artifact": self._send(HTTPStatus.OK, controller.artifact(parse_qs(parsed.query).get("name", [""])[0]))

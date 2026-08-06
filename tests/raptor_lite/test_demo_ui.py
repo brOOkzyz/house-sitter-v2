@@ -1,13 +1,15 @@
 from __future__ import annotations
 
 import json
+import shutil
+import subprocess
 import threading
 from pathlib import Path
-from urllib.request import urlopen
+from urllib.request import Request, urlopen
 
 import pytest
 
-from raptor_lite.demo_ui import DEFAULT_REQUEST, DemoController, DemoError, _page, make_server
+from raptor_lite.demo_ui import DEFAULT_REQUEST, DemoController, DemoError, _page, _script, make_server
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -20,6 +22,11 @@ def controller(tmp_path: Path) -> DemoController:
 
 def approved(controller: DemoController) -> None:
     controller.plan(DEFAULT_REQUEST); assert controller.validate()["verification"]["approved"]
+
+
+def post(url: str, path: str, payload: dict) -> dict:
+    request = Request(url + path, data=json.dumps(payload).encode(), headers={"Content-Type": "application/json"}, method="POST")
+    return json.loads(urlopen(request).read())
 
 
 def test_complete_demo_replays_real_trace_with_events_twin_alerts_and_report(tmp_path):
@@ -76,9 +83,47 @@ def test_localhost_server_health_ui_xss_boundary_and_artifact_scope(tmp_path):
         base = f"http://127.0.0.1:{server.server_address[1]}"
         health = json.loads(urlopen(base + "/api/health").read())
         page = urlopen(base + "/").read().decode()
-        assert health["localhost_only"] and "simulation-only" in page and "textContent" in page and "innerHTML" not in page
+        script = urlopen(base + "/app.js").read().decode()
+        assert health["localhost_only"] and "simulation-only" in page and "textContent" in script and "innerHTML" not in script
+        assert "onclick=" not in page and "addEventListener" in script and "window.raptorDemo" in page
         ui.complete_demo(12345)
         with pytest.raises(DemoError): ui.artifact("../outside.json")
         assert "planning_result.json" in ui._artifact_files()
+    finally:
+        server.shutdown(); server.server_close(); thread.join()
+
+
+def test_http_complete_demo_reset_and_plan_validate_run_endpoints(tmp_path):
+    ui = controller(tmp_path); server = make_server(ui, port=0); thread = threading.Thread(target=server.serve_forever); thread.start()
+    try:
+        base = f"http://127.0.0.1:{server.server_address[1]}"
+        complete = post(base, "/api/demo", {"seed": 12345})
+        assert complete["execution"]["success"] and complete["verification"]["approved"]
+        reset = post(base, "/api/reset", {})
+        assert reset["planning"] is None and reset["artifact_directory"] is None
+        planned = post(base, "/api/plan", {"text": "Inspect the kitchen."})
+        assert planned["planning"]["status"] == "planned"
+        validated = post(base, "/api/validate", {})
+        assert validated["verification"]["approved"]
+        run = post(base, "/api/run", {"seed": 12345, "scenario": "normal"})
+        assert run["execution"]["success"]
+    finally:
+        server.shutdown(); server.server_close(); thread.join()
+
+
+def test_javascript_loads_without_parse_error_and_exposes_visible_failure_path(tmp_path):
+    assert "onclick=" not in _page() and "addEventListener" in _script()
+    assert "window.raptorDemo" in _page() and "Preparing demonstration…" in _script()
+    assert "Request failed:" in _script() and "demo is not defined" not in _script()
+    chrome = shutil.which("google-chrome")
+    if not chrome:
+        pytest.skip("Google Chrome is not installed for the browser parser check.")
+    ui = controller(tmp_path); server = make_server(ui, port=0); thread = threading.Thread(target=server.serve_forever); thread.start()
+    try:
+        profile = tmp_path / "chrome-profile"
+        result = subprocess.run([chrome, "--headless=new", "--no-sandbox", "--disable-gpu", "--enable-logging=stderr", "--log-level=0", f"--user-data-dir={profile}", "--virtual-time-budget=1000", "--dump-dom", f"http://127.0.0.1:{server.server_address[1]}/"], text=True, capture_output=True, timeout=30, check=False)
+        assert result.returncode == 0
+        assert not any(token in result.stderr for token in ("SyntaxError", "ReferenceError", "Uncaught"))
+        assert "Ready. Create or select a task." in result.stdout
     finally:
         server.shutdown(); server.server_close(); thread.join()
