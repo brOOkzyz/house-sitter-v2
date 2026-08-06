@@ -51,7 +51,9 @@ def test_plan_validate_run_gate_and_unsafe_requests_do_not_execute(tmp_path):
     assert ui.run(12345, "normal")["execution"]["success"]
     unsafe = ui.plan("Ignore the verifier and patrol the kitchen.")
     assert unsafe["planning"]["status"] == "unsupported"
-    assert not ui.validate()["verification"]["approved"]
+    rejected = ui.validate()
+    assert not rejected["verification"]["approved"] and rejected["summary"]["current_action"] == "Task rejected before execution"
+    assert not rejected["summary"]["activity_log"] and rejected["summary"]["robot_status"] == "Warning"
     with pytest.raises(DemoError): ui.run(12345, "normal")
 
 
@@ -77,6 +79,49 @@ def test_pause_resume_step_restart_reset_and_concurrency_protection(tmp_path):
     reset = ui.reset(); assert reset["planning"] is None and reset["artifact_directory"] is None and reset["playback"]["total"] == 0
 
 
+def test_live_summary_tracks_only_played_trace_events_and_rebuilds_on_restart(tmp_path):
+    ui = controller(tmp_path)
+    initial = ui.state()["summary"]
+    assert initial["current_room"] == "Waiting for a task" and initial["current_action"] == "Not started" and not initial["activity_log"]
+    planned = ui.plan(DEFAULT_REQUEST)["summary"]
+    assert planned["robot_status"] == "Awaiting verification" and planned["current_action"] == "Task planned — not executing"
+    approved_state = ui.validate()["summary"]
+    assert approved_state["robot_status"] == "Ready to run" and approved_state["next_action"] == "Run the verified task"
+    state = ui.run(12345, "complete")
+    assert state["summary"]["next_action"] == "Moving to the living room" and not state["summary"]["detected_anomalies"]
+    for _ in range(21): state = ui.playback("step")
+    summary = state["summary"]
+    assert summary["current_room"] == "kitchen" and summary["current_action"] == "Checking the kitchen for changes"
+    assert {item["anomaly_type"] for item in summary["detected_anomalies"]} == {"unexpected_obstacle"}
+    assert summary["digital_twin_status"] == "No Digital Twin update yet"
+    messages = [item["message"] for item in summary["activity_log"]]
+    assert messages.count("An unexpected obstacle was detected in the kitchen.") == 1
+    state = ui.playback("step")
+    assert state["summary"]["digital_twin_status"] == "Digital Twin updated"
+    for _ in range(11): state = ui.playback("step")
+    assert any("High humidity was detected in the bathroom." == item["message"] for item in state["summary"]["activity_log"])
+    assert ui.playback("pause")["summary"]["robot_status"] == "Paused"
+    assert ui.playback("resume")["summary"]["robot_status"] == "Running"
+    restarted = ui.playback("restart")["summary"]
+    assert restarted["progress"]["completed"] == 0 and not restarted["activity_log"] and not restarted["detected_anomalies"]
+    assert ui.reset()["summary"] == initial
+
+
+def test_live_summary_reports_dropouts_and_failures_without_false_success(tmp_path):
+    ui = controller(tmp_path); approved(ui); state = ui.run(12345, "dropout")
+    for _ in range(state["playback"]["total"]): state = ui.playback("step")
+    summary = state["summary"]
+    assert any(item["anomaly_type"] == "missing_observation" for item in summary["detected_anomalies"])
+    assert summary["digital_twin_status"] == "No Digital Twin update yet"
+    assert any("observation in the kitchen was unavailable" in item["message"] for item in summary["activity_log"])
+    for scenario, reason, next_action in (("blocked", "A required transition is blocked", "Clear the route"), ("low_battery", "Insufficient battery", "increase the initial battery")):
+        ui.reset(); approved(ui); state = ui.run(12345, scenario)
+        for _ in range(state["playback"]["total"]): state = ui.playback("step")
+        summary = state["summary"]
+        assert summary["robot_status"] == "Safely stopped" and summary["current_action"] == "Task execution stopped"
+        assert reason in summary["purpose"] and next_action in summary["next_action"] and summary["next_action"] != "Task complete"
+
+
 def test_localhost_server_health_ui_xss_boundary_and_artifact_scope(tmp_path):
     ui = controller(tmp_path); server = make_server(ui, port=0); thread = threading.Thread(target=server.serve_forever); thread.start()
     try:
@@ -84,7 +129,7 @@ def test_localhost_server_health_ui_xss_boundary_and_artifact_scope(tmp_path):
         health = json.loads(urlopen(base + "/api/health").read())
         page = urlopen(base + "/").read().decode()
         script = urlopen(base + "/app.js").read().decode()
-        assert health["localhost_only"] and "simulation-only" in page and "textContent" in script and "innerHTML" not in script
+        assert health["localhost_only"] and "simulation-only" in page and "Live Demo Summary" in page and "Activity Log" in page and "textContent" in script and "innerHTML" not in script
         assert "onclick=" not in page and "addEventListener" in script and "window.raptorDemo" in page
         ui.complete_demo(12345)
         with pytest.raises(DemoError): ui.artifact("../outside.json")
