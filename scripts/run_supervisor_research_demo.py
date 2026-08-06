@@ -213,16 +213,37 @@ class ResearchDemo:
     def step3(self) -> bool:
         if self.args.skip_2d:
             self.say("The 2D patrol demonstration was skipped."); return True
-        command = [sys.executable, str(self.root / "scripts/run_house_v1_visual_demo.py"), "--text", "Patrol the whole house"]
         if self.args.non_interactive:
-            command.extend(["--non-interactive", "--export-gif"])
-            result = self.run_command(command, 3, 20)
-            self.say("The deterministic 2D patrol was generated with semantic regions, accepted safe goals and A* paths.")
-            return bool(result.stdout is not None)
+            self.say("The 2D patrol GUI is skipped in non-interactive mode.")
+            return True
+        command = [
+            sys.executable,
+            str(self.root / "scripts" / "run_house_v1_visual_demo.py"),
+            "--2d-only",
+        ]
+        log_path = self.logs / "step_03_2d_patrol.log"
+        self.say("Opening the 2D patrol demonstration...")
+        self.say("Close the patrol window to return to the main demonstration.")
         try:
-            return self.launch(command, "2D patrol demonstration", 20)
-        except DemoError:
-            self.say("The 2D animation is unavailable. Patrol order: living_room → kitchen → bedroom → bathroom → charging_area.")
+            with log_path.open("w", encoding="utf-8") as log_handle:
+                process = subprocess.Popen(command, cwd=str(self.root), env=os.environ.copy(), stdout=log_handle,
+                                           stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL, start_new_session=True)
+                self.children.append(Child(process, "2D patrol demonstration"))
+                time.sleep(1.0)
+                immediate_status = process.poll()
+                if immediate_status not in {None, 0}:
+                    raise DemoError(f"The 2D patrol window could not be opened. Log file location: {log_path}")
+                if immediate_status is None:
+                    process.wait()
+            self.say("The 2D patrol demonstration has finished.")
+            return True
+        except (OSError, subprocess.SubprocessError, DemoError):
+            self.say("The 2D patrol window could not be opened.")
+            self.say("The demonstration will continue with a route summary.")
+            self.say("Patrol order: living_room → kitchen → bedroom → bathroom → charging_area")
+            self.say("Number of route segments: 5")
+            self.say("Returned to charging area: Yes")
+            self.say(f"Log file location: {log_path}")
             return True
 
     def step4(self) -> bool:

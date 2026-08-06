@@ -10,16 +10,23 @@ import tempfile
 import unittest
 from argparse import Namespace
 from pathlib import Path
+from types import SimpleNamespace
 from unittest import mock
 
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "scripts" / "run_supervisor_research_demo.py"
+VISUAL_SCRIPT = ROOT / "scripts" / "run_house_v1_visual_demo.py"
 SPEC = importlib.util.spec_from_file_location("supervisor_research_demo", SCRIPT)
 assert SPEC and SPEC.loader
 demo_module = importlib.util.module_from_spec(SPEC)
 sys.modules[SPEC.name] = demo_module
 SPEC.loader.exec_module(demo_module)
+VISUAL_SPEC = importlib.util.spec_from_file_location("house_v1_visual_demo_supervisor_test", VISUAL_SCRIPT)
+assert VISUAL_SPEC and VISUAL_SPEC.loader
+visual_module = importlib.util.module_from_spec(VISUAL_SPEC)
+sys.modules[VISUAL_SPEC.name] = visual_module
+VISUAL_SPEC.loader.exec_module(visual_module)
 
 
 def args(**overrides):
@@ -47,6 +54,77 @@ class SupervisorResearchDemoTests(unittest.TestCase):
             self.assertTrue(instance.step2())
             self.assertTrue(instance.step3())
         launch.assert_not_called()
+
+    def test_step3_uses_the_non_interactive_pure_2d_command_and_waits_for_close(self):
+        instance = demo_module.ResearchDemo(args())
+        process = mock.Mock()
+        process.poll.side_effect = [None]
+        with mock.patch.object(demo_module.subprocess, "Popen", return_value=process) as popen, mock.patch.object(demo_module.time, "sleep"):
+            self.assertTrue(instance.step3())
+        popen.assert_called_once()
+        command = popen.call_args.args[0]
+        self.assertEqual(command, [sys.executable, str(ROOT / "scripts" / "run_house_v1_visual_demo.py"), "--2d-only"])
+        self.assertEqual(popen.call_args.kwargs["cwd"], str(ROOT))
+        self.assertEqual(popen.call_args.kwargs["env"], __import__("os").environ.copy())
+        self.assertIs(popen.call_args.kwargs["stdin"], demo_module.subprocess.DEVNULL)
+        self.assertTrue(popen.call_args.kwargs["start_new_session"])
+        self.assertNotIn("shell", popen.call_args.kwargs)
+        process.wait.assert_called_once_with()
+        self.assertEqual(len(instance.children), 1)
+
+    def test_step3_immediate_failure_falls_back_in_english_with_log_location(self):
+        instance = demo_module.ResearchDemo(args())
+        process = mock.Mock()
+        process.poll.return_value = 2
+        with mock.patch.object(demo_module.subprocess, "Popen", return_value=process), mock.patch.object(demo_module.time, "sleep"), mock.patch.object(instance, "say") as say:
+            self.assertTrue(instance.step3())
+        output = "\n".join(str(call.args[0]) for call in say.call_args_list)
+        self.assertIn("The 2D patrol window could not be opened.", output)
+        self.assertIn("Log file location:", output)
+
+    def test_step3_uses_the_supported_pure_2d_visual_demo_entry(self):
+        self.assertTrue(VISUAL_SCRIPT.is_file())
+        self.assertNotIn("--text\", \"Patrol the whole house", SCRIPT.read_text(encoding="utf-8"))
+        source = VISUAL_SCRIPT.read_text(encoding="utf-8")
+        self.assertIn('"--2d-only"', source)
+        self.assertIn("auto_advance=args.two_d_only", source)
+
+    def test_pure_2d_entry_skips_static_preview_and_all_terminal_waits(self):
+        inputs = object()
+        demo = SimpleNamespace(parsed={"status": "accepted"}, planner_plan={"planning_status": "ready"})
+        with mock.patch.object(visual_module, "optional_static_preview") as static_preview, \
+             mock.patch.object(visual_module, "load_house_v1_inputs", return_value=inputs), \
+             mock.patch.object(visual_module, "build_visual_demo", return_value=demo), \
+             mock.patch.object(visual_module, "write_visual_artifacts", return_value={}), \
+             mock.patch.object(visual_module, "run_interactive") as run_interactive, \
+             mock.patch("builtins.input", side_effect=AssertionError("--2d-only must not read stdin")):
+            self.assertEqual(visual_module.main(["--2d-only"]), 0)
+        static_preview.assert_not_called()
+        run_interactive.assert_called_once_with(inputs, demo, non_interactive=False, auto_advance=True)
+
+    def test_auto_advance_path_does_not_call_terminal_waits(self):
+        renderer = mock.Mock()
+        renderer.fig.canvas.mpl_connect = mock.Mock()
+        renderer.plt = mock.Mock()
+        demo = SimpleNamespace(accepted=True)
+        with mock.patch.object(visual_module, "HouseRenderer", return_value=renderer), \
+             mock.patch.object(visual_module, "trajectory_points", return_value=[object()]), \
+             mock.patch.object(visual_module, "_wait", side_effect=AssertionError("pure 2D must not wait for stdin")):
+            visual_module.run_interactive(object(), demo, non_interactive=False, auto_advance=True)
+        renderer.plt.show.assert_called_once_with(block=False)
+        renderer.plt.close.assert_called_once_with(renderer.fig)
+
+    def test_default_visual_demo_path_preserves_its_existing_interactive_mode(self):
+        inputs = object()
+        demo = SimpleNamespace(parsed={"status": "accepted"}, planner_plan={"planning_status": "ready"})
+        with mock.patch.object(visual_module, "optional_static_preview", return_value=True) as static_preview, \
+             mock.patch.object(visual_module, "load_house_v1_inputs", return_value=inputs), \
+             mock.patch.object(visual_module, "build_visual_demo", return_value=demo), \
+             mock.patch.object(visual_module, "write_visual_artifacts", return_value={}), \
+             mock.patch.object(visual_module, "run_interactive") as run_interactive:
+            self.assertEqual(visual_module.main([]), 0)
+        static_preview.assert_called_once_with(non_interactive=False)
+        run_interactive.assert_called_once_with(inputs, demo, non_interactive=False, auto_advance=False)
 
     def test_paper_result_discovery_and_missing_fallback(self):
         with tempfile.TemporaryDirectory() as directory:

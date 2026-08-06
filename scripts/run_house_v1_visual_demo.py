@@ -474,7 +474,19 @@ def _wait(message: str, non_interactive: bool) -> bool:
         return False
 
 
-def run_interactive(inputs: HouseInputs, demo: VisualDemo, *, non_interactive: bool) -> None:
+def run_interactive(
+    inputs: HouseInputs,
+    demo: VisualDemo,
+    *,
+    non_interactive: bool,
+    auto_advance: bool = False,
+) -> None:
+    """Display the existing patrol animation, optionally without terminal pauses.
+
+    ``auto_advance`` is reserved for the supervisor's pure-2D launch path.  It
+    deliberately changes neither the map nor the animation; it only bypasses
+    the presentation pauses that otherwise require terminal input.
+    """
     renderer = HouseRenderer(inputs, demo)
     frames = trajectory_points(demo)
     if non_interactive:
@@ -482,6 +494,10 @@ def run_interactive(inputs: HouseInputs, demo: VisualDemo, *, non_interactive: b
         renderer.plt.close(renderer.fig)
         return
     state = {"paused": False, "quit": False, "restart": False}
+
+    def wait_for_step(message: str) -> bool:
+        return True if auto_advance else _wait(message, False)
+
     def on_key(event: Any) -> None:
         if event.key == " ": state["paused"] = not state["paused"]
         elif event.key == "r": state["restart"] = True
@@ -494,11 +510,11 @@ def run_interactive(inputs: HouseInputs, demo: VisualDemo, *, non_interactive: b
     for phase, message in phases:
         renderer.draw(phase, 0, frames)
         renderer.plt.pause(.01)
-        if not _wait(message, False) or state["quit"]: return
+        if not wait_for_step(message) or state["quit"]: return
     if not demo.accepted:
         renderer.draw("rejected", 0, frames); renderer.plt.pause(.01)
-        _wait("请求未被接受，不启动动画", False); return
-    if not _wait("步骤 7/8：开始机器人沿规划路径移动", False) or state["quit"]:
+        wait_for_step("请求未被接受，不启动动画"); return
+    if not wait_for_step("步骤 7/8：开始机器人沿规划路径移动") or state["quit"]:
         return
     index = 0
     while index < len(frames) and not state["quit"]:
@@ -508,7 +524,7 @@ def run_interactive(inputs: HouseInputs, demo: VisualDemo, *, non_interactive: b
         renderer.plt.pause(.035)
     if not state["quit"]:
         renderer.draw("result", len(frames) - 1, frames); renderer.plt.pause(.01)
-        _wait("步骤 8/8：最终结果与 artifact", False)
+        wait_for_step("步骤 8/8：最终结果与 artifact")
     renderer.plt.close(renderer.fig)
 
 
@@ -517,9 +533,15 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--text", default="检查厨房", help="现有自然语言适配器支持的请求文本")
     parser.add_argument("--non-interactive", action="store_true", help="用于自动生成，无窗口交互")
     parser.add_argument("--export-gif", action="store_true", help="额外生成会议备用 GIF")
+    parser.add_argument(
+        "--2d-only",
+        action="store_true",
+        dest="two_d_only",
+        help="run the existing 2D patrol animation without the static-preview menu or terminal pauses",
+    )
     args = parser.parse_args(argv)
     try:
-        if not optional_static_preview(non_interactive=args.non_interactive):
+        if not args.two_d_only and not optional_static_preview(non_interactive=args.non_interactive):
             print("演示已安全退出。")
             return 0
         inputs = load_house_v1_inputs()
@@ -530,7 +552,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"解析状态：{demo.parsed.get('status')}；规划状态：{demo.planner_plan.get('planning_status')}；action_goals_sent=0")
         print("住宅二维演示不调用 ROS、Gazebo、Nav2 或 RViz；warehouse 保留真实 Gazebo/Nav2 回归用途。")
         print("已生成：" + "、".join(path.name for path in paths.values()))
-        run_interactive(inputs, demo, non_interactive=args.non_interactive)
+        run_interactive(inputs, demo, non_interactive=args.non_interactive, auto_advance=args.two_d_only)
         return 0
     except (VisualDemoError, OSError, ValueError) as exc:
         print(f"演示无法完成：{exc}", file=sys.stderr)

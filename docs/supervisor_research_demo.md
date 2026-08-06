@@ -41,7 +41,7 @@ Ctrl+C also exits safely. Use --start-at 8 to resume from the research-results s
 
 ## Fallback behaviour and safety boundary
 
-The 3D step only opens the static preview_house_v1_3d.sh residential preview. The 2D step is a deterministic patrol demonstration from run_house_v1_visual_demo.py. If a GUI cannot be opened, the program continues with a file path or text summary.
+The 3D step only opens the static preview_house_v1_3d.sh residential preview. The 2D step starts run_house_v1_visual_demo.py with its --2d-only presentation entry. This bypasses the visual script's optional 3D menu and terminal pauses, while reusing its existing deterministic 2D animation; the supervisor waits until the patrol window closes. If that window exits abnormally, the program continues with an English route summary and a log-file location.
 
 When cached paper results are absent, the research steps use text fallback summaries and do not regenerate experiments. Monitoring artefacts are stored in monitoring_artifacts/ under the selected output directory, and command logs are stored in logs/. The program only terminates GUI processes that it created.
 
