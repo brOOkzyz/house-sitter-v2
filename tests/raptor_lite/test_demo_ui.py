@@ -89,16 +89,16 @@ def test_live_summary_tracks_only_played_trace_events_and_rebuilds_on_restart(tm
     assert approved_state["robot_status"] == "Ready to run" and approved_state["next_action"] == "Run the verified task"
     state = ui.run(12345, "complete")
     assert state["summary"]["next_action"] == "Moving to the living room" and not state["summary"]["detected_anomalies"]
-    for _ in range(21): state = ui.playback("step")
+    while state["summary"]["current_action"] != "Detected change": state = ui.playback("step")
     summary = state["summary"]
-    assert summary["current_room"] == "kitchen" and summary["current_action"] == "Checking the kitchen for changes"
+    assert summary["current_room"] == "kitchen" and summary["current_action"] == "Detected change"
     assert {item["anomaly_type"] for item in summary["detected_anomalies"]} == {"unexpected_obstacle"}
     assert summary["digital_twin_status"] == "No Digital Twin update yet"
     messages = [item["message"] for item in summary["activity_log"]]
     assert messages.count("An unexpected obstacle was detected in the kitchen.") == 1
     state = ui.playback("step")
     assert state["summary"]["digital_twin_status"] == "Digital Twin updated"
-    for _ in range(11): state = ui.playback("step")
+    while not any("High humidity was detected in the bathroom." == item["message"] for item in state["summary"]["activity_log"]): state = ui.playback("step")
     assert any("High humidity was detected in the bathroom." == item["message"] for item in state["summary"]["activity_log"])
     assert ui.playback("pause")["summary"]["robot_status"] == "Paused"
     assert ui.playback("resume")["summary"]["robot_status"] == "Running"
@@ -120,6 +120,45 @@ def test_live_summary_reports_dropouts_and_failures_without_false_success(tmp_pa
         summary = state["summary"]
         assert summary["robot_status"] == "Safely stopped" and summary["current_action"] == "Task execution stopped"
         assert reason in summary["purpose"] and next_action in summary["next_action"] and summary["next_action"] != "Task complete"
+
+
+def test_continuous_playback_is_deterministic_and_reveals_changes_only_after_detection(tmp_path):
+    first, second = controller(tmp_path / "one"), controller(tmp_path / "two")
+    first.complete_demo(12345); second.complete_demo(12345)
+    assert first.playback_trace == second.playback_trace and len(first.playback_trace) > len(first.trace)
+    positions = [entry["position"] for entry in first.playback_trace]
+    assert all(((right[0] - left[0]) ** 2 + (right[1] - left[1]) ** 2) ** 0.5 <= 0.36 for left, right in zip(positions, positions[1:]))
+    assert any(entry["waypoint"] == "hallway" for entry in first.playback_trace)
+    state = first.state()
+    while state["playback"]["frame"]["trace_count"] < 13:
+        state = first.playback("step")
+        assert not state["playback"]["frame"]["anomalies"]
+    assert state["playback"]["frame"]["events"]  # physical changes exist after injection, not confirmed changes
+    while not state["playback"]["frame"]["anomalies"]:
+        state = first.playback("step")
+    frame = state["playback"]["frame"]
+    assert frame["trace_count"] == 21 and {item["room"] for item in frame["anomalies"]} == {"kitchen"}
+    assert not any(update.get("updated") for update in frame["twin_updates"])
+    state = first.playback("step")
+    assert state["playback"]["frame"]["trace_count"] == 22 and state["summary"]["digital_twin_status"] == "Digital Twin updated"
+    while not any(item["room"] == "bathroom" for item in state["playback"]["frame"]["anomalies"]): state = first.playback("step")
+    assert state["playback"]["frame"]["trace_count"] == 31
+
+
+def test_continuous_playback_summary_controls_and_failed_routes_do_not_teleport(tmp_path):
+    ui = controller(tmp_path); state = ui.complete_demo(12345)
+    state = ui.playback("step")
+    frame, summary = state["playback"]["frame"], state["summary"]
+    assert summary["current_location"] == frame["current_room"].replace("_", " ") and summary["current_action"] == frame["playback_action"]
+    paused = ui.playback("pause"); frozen = paused["playback"]["frame"]["pose"]
+    assert paused["summary"]["robot_status"] == "Paused" and ui.advance()["playback"]["frame"]["pose"] == frozen
+    assert ui.playback("resume")["summary"]["robot_status"] == "Running"
+    restarted = ui.playback("restart")
+    assert restarted["playback"]["index"] == 0 and not restarted["summary"]["activity_log"] and not restarted["playback"]["frame"]["travelled_path"]
+    ui.reset(); approved(ui); failed = ui.run(12345, "blocked")
+    for _ in range(failed["playback"]["total"]): failed = ui.playback("step")
+    assert failed["summary"]["robot_status"] == "Safely stopped" and failed["playback"]["frame"]["failure"]
+    assert all(entry["action"] != "Moving to the kitchen" or entry["trace_count"] < len(ui.trace) for entry in ui.playback_trace)
 
 
 def test_localhost_server_health_ui_xss_boundary_and_artifact_scope(tmp_path):
@@ -168,7 +207,7 @@ def test_javascript_loads_without_parse_error_and_exposes_visible_failure_path(t
         profile = tmp_path / "chrome-profile"
         result = subprocess.run([chrome, "--headless=new", "--no-sandbox", "--disable-gpu", "--enable-logging=stderr", "--log-level=0", f"--user-data-dir={profile}", "--virtual-time-budget=1000", "--dump-dom", f"http://127.0.0.1:{server.server_address[1]}/"], text=True, capture_output=True, timeout=30, check=False)
         assert result.returncode == 0
-        assert not any(token in result.stderr for token in ("SyntaxError", "ReferenceError", "Uncaught"))
+        assert not any(token in result.stderr for token in ("SyntaxError", "ReferenceError", "Uncaught", "<rect> attribute"))
         assert "Ready. Create or select a task." in result.stdout
     finally:
         server.shutdown(); server.server_close(); thread.join()

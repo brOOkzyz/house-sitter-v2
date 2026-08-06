@@ -10,7 +10,7 @@ from raptor_lite.artifacts import write_run
 from raptor_lite.backends import BackendError
 from raptor_lite.capability_registry import CapabilityRegistry
 from raptor_lite.executor import BackendExecutor, MockExecutor
-from raptor_lite.house2d import House2DBackend
+from raptor_lite.house2d import DOORS, HOUSE_LAYOUT, LAYOUT_CONNECTIONS, House2DBackend, layout_location, layout_route
 from raptor_lite.task_schema import load_task
 from raptor_lite.verifier import verify_task
 
@@ -32,6 +32,25 @@ def test_seeded_reset_and_world_variation_are_reproducible():
     assert first.artifact_bundle()["scenario_ground_truth"] == second.artifact_bundle()["scenario_ground_truth"]
     different = House2DBackend(seed=54321); different.initialize(task)
     assert first.artifact_bundle()["scenario_ground_truth"]["rooms"] != different.artifact_bundle()["scenario_ground_truth"]["rooms"]
+
+
+def test_presentation_house_layout_has_walkable_rooms_doors_and_legal_routes():
+    rooms = HOUSE_LAYOUT["rooms"]
+    assert {"charging_area", "hallway", "living_room", "kitchen", "bedroom", "bathroom"} <= set(rooms)
+    for room, data in rooms.items():
+        left, bottom, right, top = data["bounds"]
+        assert left < right and bottom < top and data["label"]
+        if room != "hallway": assert room in HOUSE_LAYOUT["checkpoints"]
+    for _, _, (left, bottom, right, top) in HOUSE_LAYOUT["furniture"]:
+        assert left < right and bottom < top
+    assert HOUSE_LAYOUT["doors"]
+    for start, target in DOORS:
+        points = layout_route([start, target])
+        assert len(points) > 2 and frozenset((start, target)) in LAYOUT_CONNECTIONS
+        for first, second in zip(points, points[1:]):
+            for fraction in (0.25, 0.5, 0.75):
+                point = [first[0] + (second[0] - first[0]) * fraction, first[1] + (second[1] - first[1]) * fraction]
+                assert layout_location(point) in rooms
 
 
 def test_legal_routes_consume_time_battery_and_return_to_start():

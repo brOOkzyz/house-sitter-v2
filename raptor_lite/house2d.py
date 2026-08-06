@@ -19,6 +19,58 @@ ROOMS = {
     "bathroom": {"center": [8.0, 7.5], "bounds": [6.0, 5.0, 10.0, 10.0]},
 }
 DOORS = (("charging_area", "living_room"), ("living_room", "kitchen"), ("living_room", "bedroom"), ("bedroom", "bathroom"), ("kitchen", "bathroom"))
+# Presentation-only geometry.  The backend keeps the compact room graph above;
+# this shared layout expands each legal graph edge through actual doorways.
+HOUSE_LAYOUT = {
+    "bounds": [0.0, 0.0, 12.0, 10.0],
+    "rooms": {
+        "charging_area": {"bounds": [0.5, 0.5, 2.5, 2.5], "label": "Charging area"},
+        "hallway": {"bounds": [2.5, 0.5, 4.0, 9.5], "label": "Entrance hall"},
+        "living_room": {"bounds": [4.0, 0.5, 8.0, 5.0], "label": "Living room"},
+        "kitchen": {"bounds": [8.0, 0.5, 11.5, 5.0], "label": "Kitchen"},
+        "bedroom": {"bounds": [4.0, 5.0, 8.0, 9.5], "label": "Bedroom"},
+        "bathroom": {"bounds": [8.0, 5.0, 11.5, 9.5], "label": "Bathroom"},
+    },
+    "checkpoints": {
+        "charging_area": [1.4, 1.4], "living_room": [6.0, 2.8], "kitchen": [9.8, 2.8],
+        "bedroom": [6.0, 7.5], "bathroom": [9.8, 7.5],
+    },
+    "doors": [[2.5, 1.5, "vertical"], [4.0, 2.5, "vertical"], [8.0, 2.5, "vertical"], [6.0, 5.0, "horizontal"], [9.8, 5.0, "horizontal"], [8.0, 7.5, "vertical"]],
+    "furniture": [["living_room", "sofa", [4.6, 1.1, 6.1, 1.7]], ["living_room", "table", [6.7, 3.4, 7.4, 4.1]], ["kitchen", "counter", [10.4, 1.0, 11.1, 3.5]], ["bedroom", "bed", [4.6, 6.1, 6.4, 7.3]], ["bathroom", "bath", [10.4, 6.0, 11.0, 7.8]]],
+}
+LAYOUT_WAYPOINTS = {
+    "charging_area": [1.4, 1.4], "charging_door": [2.5, 1.5], "hall_lower": [3.25, 1.5], "living_hall_door": [4.0, 2.5],
+    "living_room": [6.0, 2.8], "living_kitchen_door": [8.0, 2.5], "kitchen": [9.8, 2.8], "living_bedroom_door": [6.0, 5.0],
+    "bedroom": [6.0, 7.5], "kitchen_bathroom_door": [9.8, 5.0], "bathroom": [9.8, 7.5], "bedroom_bathroom_door": [8.0, 7.5],
+}
+LAYOUT_CONNECTIONS = {
+    frozenset(("charging_area", "living_room")): ("charging_area", "charging_door", "hall_lower", "living_hall_door", "living_room"),
+    frozenset(("living_room", "kitchen")): ("living_room", "living_kitchen_door", "kitchen"),
+    frozenset(("living_room", "bedroom")): ("living_room", "living_bedroom_door", "bedroom"),
+    frozenset(("kitchen", "bathroom")): ("kitchen", "kitchen_bathroom_door", "bathroom"),
+    frozenset(("bedroom", "bathroom")): ("bedroom", "bedroom_bathroom_door", "bathroom"),
+}
+
+
+def layout_route(rooms: list[str]) -> list[list[float]]:
+    """Expand a backend-approved room route through the matching visible doors."""
+    if not rooms: return []
+    points = [list(LAYOUT_WAYPOINTS[rooms[0]])]
+    for start, target in zip(rooms, rooms[1:]):
+        names = LAYOUT_CONNECTIONS.get(frozenset((start, target)))
+        if names is None:
+            raise ValueError(f"No presentation route from '{start}' to '{target}'.")
+        if names[0] != start: names = tuple(reversed(names))
+        points.extend(list(LAYOUT_WAYPOINTS[name]) for name in names[1:])
+    return points
+
+
+def layout_location(point: list[float]) -> str:
+    x, y = point
+    for room, data in HOUSE_LAYOUT["rooms"].items():
+        left, bottom, right, top = data["bounds"]
+        if left < x < right and bottom < y < top: return room
+    return "hallway"
 EVENTS = {"unexpected_obstacle", "high_temperature", "high_humidity", "blocked_transition", "observation_dropout", "low_initial_battery", "transient_false_reading"}
 ALL_SKILLS = {"move_to_room", "inspect_room", "record_baseline", "establish_household_baseline", "inject_household_events", "revisit_active_event_rooms", "detect_environment_change", "update_digital_twin", "generate_alert", "generate_monitoring_report", "return_to_start", "stop"}
 
