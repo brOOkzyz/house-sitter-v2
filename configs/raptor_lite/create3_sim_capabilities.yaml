@@ -1,0 +1,85 @@
+available_capabilities: [simulation, house_sitter_monitoring, safe_stop]
+capabilities:
+  - name: move_to_room
+    description: Record deterministic simulated entry into a declared room.
+    parameters: [{name: room, type: string, required: true, allowed_values: [living_room, kitchen, bedroom, bathroom, charging_area]}]
+    required_capabilities: [simulation, house_sitter_monitoring]
+    timeout_seconds: 30
+    safety_constraints: [simulation_only, bounded_timeout]
+    execution_adapter: mock
+    simulation_supported: true
+    physical_robot_supported: false
+  - name: inspect_room
+    description: Produce a deterministic simulation-only room observation.
+    parameters: [{name: room, type: string, required: true, allowed_values: [living_room, kitchen, bedroom, bathroom, charging_area]}]
+    required_capabilities: [simulation]
+    timeout_seconds: 20
+    safety_constraints: [simulation_only]
+    execution_adapter: mock
+    simulation_supported: true
+    physical_robot_supported: false
+  - name: record_baseline
+    description: Store a room baseline from a simulated observation.
+    parameters: [{name: room, type: string, required: true, allowed_values: [living_room, kitchen, bedroom, bathroom, charging_area]}]
+    required_capabilities: [simulation]
+    timeout_seconds: 10
+    safety_constraints: [simulation_only]
+    execution_adapter: mock
+    simulation_supported: true
+    physical_robot_supported: false
+  - name: detect_environment_change
+    description: Compare a simulated room observation with its baseline.
+    parameters: [{name: room, type: string, required: true, allowed_values: [living_room, kitchen, bedroom, bathroom, charging_area]}]
+    required_capabilities: [simulation, house_sitter_monitoring]
+    timeout_seconds: 15
+    safety_constraints: [simulation_only]
+    execution_adapter: mock
+    simulation_supported: true
+    physical_robot_supported: false
+  - name: update_digital_twin
+    description: Update the simulation-only Digital Twin for one room.
+    parameters: [{name: room, type: string, required: true, allowed_values: [living_room, kitchen, bedroom, bathroom, charging_area]}]
+    required_capabilities: [simulation, house_sitter_monitoring]
+    timeout_seconds: 10
+    safety_constraints: [simulation_only, room_scoped]
+    execution_adapter: mock
+    simulation_supported: true
+    physical_robot_supported: false
+  - name: generate_alert
+    description: Create a structured simulation-only alert.
+    parameters:
+      - {name: room, type: string, required: true, allowed_values: [living_room, kitchen, bedroom, bathroom, charging_area]}
+      - {name: severity, type: string, required: false, allowed_values: [info, warning, critical], default: warning}
+    required_capabilities: [simulation, house_sitter_monitoring]
+    timeout_seconds: 10
+    safety_constraints: [simulation_only]
+    execution_adapter: mock
+    simulation_supported: true
+    physical_robot_supported: false
+  - name: generate_monitoring_report
+    description: Render a reproducible monitoring summary.
+    parameters: []
+    required_capabilities: [simulation, house_sitter_monitoring]
+    timeout_seconds: 10
+    safety_constraints: [simulation_only]
+    execution_adapter: mock
+    simulation_supported: true
+    physical_robot_supported: false
+  - name: return_to_start
+    description: Record the safety return to the simulated start location.
+    parameters: []
+    required_capabilities: [simulation, safe_stop]
+    timeout_seconds: 30
+    safety_constraints: [simulation_only, bounded_timeout, safe_return]
+    execution_adapter: mock
+    simulation_supported: true
+    physical_robot_supported: false
+  - name: stop
+    description: Record an explicit safe simulated stop.
+    parameters: []
+    required_capabilities: [simulation, safe_stop]
+    timeout_seconds: 5
+    safety_constraints: [simulation_only, explicit_stop]
+    execution_adapter: mock
+    simulation_supported: true
+    physical_robot_supported: false

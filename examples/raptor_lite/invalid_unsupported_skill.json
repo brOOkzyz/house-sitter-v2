@@ -1,0 +1,1 @@
+{"task_id":"invalid-skill","name":"Invalid task","description":"Simulation-only task.","robot_profile":"create3_sim","metadata":{"simulation_only":true},"steps":[{"step_id":"bad","skill":"fly_to_room","parameters":{},"timeout_seconds":5,"on_failure":"abort"},{"step_id":"stop","skill":"stop","parameters":{},"timeout_seconds":5,"on_failure":"stop"}]}

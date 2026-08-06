@@ -1,0 +1,1 @@
+{"task_id":"invalid-room","name":"Invalid task","description":"Simulation-only task.","robot_profile":"create3_sim","metadata":{"simulation_only":true},"steps":[{"step_id":"move","skill":"move_to_room","parameters":{"room":"garage"},"timeout_seconds":5,"on_failure":"abort"},{"step_id":"return","skill":"return_to_start","parameters":{},"timeout_seconds":5,"on_failure":"abort"}]}

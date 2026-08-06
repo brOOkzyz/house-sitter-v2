@@ -20,6 +20,8 @@ __pycache__/
 # Run artifacts
 logs/
 .venv/
+.venv_raptor_lite/
+artifacts/raptor_lite/
 
 # User-owned offline semantic-area annotation drafts
 local_annotations/*

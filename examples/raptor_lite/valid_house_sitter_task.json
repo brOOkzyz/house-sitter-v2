@@ -1,0 +1,17 @@
+{
+  "task_id": "house-sitter-baseline-001",
+  "name": "House-Sitter baseline patrol",
+  "description": "Simulation-only House-Sitter patrol with a safe return.",
+  "robot_profile": "create3_sim",
+  "metadata": {"simulation_only": true, "physical_robot_supported": false},
+  "steps": [
+    {"step_id": "enter-kitchen", "skill": "move_to_room", "parameters": {"room": "kitchen"}, "timeout_seconds": 30, "on_failure": "abort"},
+    {"step_id": "inspect-kitchen", "skill": "inspect_room", "parameters": {"room": "kitchen"}, "timeout_seconds": 20, "on_failure": "abort"},
+    {"step_id": "baseline-kitchen", "skill": "record_baseline", "parameters": {"room": "kitchen"}, "timeout_seconds": 10, "on_failure": "abort"},
+    {"step_id": "detect-kitchen", "skill": "detect_environment_change", "parameters": {"room": "kitchen"}, "timeout_seconds": 15, "on_failure": "continue"},
+    {"step_id": "twin-kitchen", "skill": "update_digital_twin", "parameters": {"room": "kitchen"}, "timeout_seconds": 10, "on_failure": "continue"},
+    {"step_id": "report", "skill": "generate_monitoring_report", "parameters": {}, "timeout_seconds": 10, "on_failure": "continue"},
+    {"step_id": "return", "skill": "return_to_start", "parameters": {}, "timeout_seconds": 30, "on_failure": "abort"},
+    {"step_id": "stop", "skill": "stop", "parameters": {}, "timeout_seconds": 5, "on_failure": "stop"}
+  ]
+}
