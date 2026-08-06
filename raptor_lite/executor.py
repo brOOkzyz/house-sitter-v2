@@ -37,6 +37,9 @@ class MockExecutor:
             observation = {"room": room, "obstacle_count": 0, "simulation_only": True, "simulated_onboard_sensor": True}
             state["observations"][room] = observation; return observation
         if skill == "record_baseline": state["baseline"][room] = state["observations"].get(room, {"room": room, "obstacle_count": 0}); return {"baseline_recorded": room}
+        if skill == "establish_household_baseline": state["baseline"][room] = state["observations"].get(room, {"room": room, "obstacle_count": 0}); return {"baseline_recorded": room}
+        if skill == "inject_household_events": state["events_injected"] = True; return {"events_injected": True, "simulation_only": True}
+        if skill == "revisit_active_event_rooms": state["room"] = room; return {"revisited_room": room, "simulation_only": True}
         if skill == "detect_environment_change": return {"room": room, "changes": [], "simulation_only": True}
         if skill == "update_digital_twin": state["twin"][room] = "updated"; return {"room": room, "digital_twin_updated": True}
         if skill == "generate_alert":
@@ -70,6 +73,7 @@ class BackendExecutor:
                 except (BackendError, ValueError, KeyError) as exc:
                     message = str(exc); result = ExecutionStepResult(step_id=step.step_id, skill=step.skill, success=False, message=message)
                     trace.append(ExecutionTrace(timestamp=f"sim:{self.backend.simulation_time():.3f}", event="step_failed", step_id=step.step_id, details={"error": message}))
+                    self.backend.record_failure(message)
                     first_failure = first_failure or message
                 results.append(result)
                 if not result.success:

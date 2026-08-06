@@ -26,7 +26,7 @@ def valid_data() -> dict:
 
 def test_registry_and_json_round_trip_are_strict():
     registry = CapabilityRegistry.from_yaml(PROFILE)
-    assert len(registry.capabilities) == 9
+    assert len(registry.capabilities) == 12
     task = load_task(EXAMPLES / "valid_house_sitter_task.json")
     assert TaskSpec.model_validate_json(task.model_dump_json()) == task
 

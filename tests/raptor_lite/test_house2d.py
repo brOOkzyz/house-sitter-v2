@@ -46,9 +46,11 @@ def test_legal_routes_consume_time_battery_and_return_to_start():
 def test_blocked_and_low_battery_fail_closed_and_stop_is_bounded():
     task, report = approved_task()
     registry = CapabilityRegistry.from_yaml(PROFILE)
-    blocked = House2DBackend(seed=1, events=["blocked_transition"]); result, _ = BackendExecutor(blocked).run(task, report, registry)
-    assert not result.success and "No legal route" in (result.first_failure or "") and blocked.artifact_bundle()["final_world_state"]["stopped"]
-    low = House2DBackend(seed=1, events=["low_initial_battery"]); result, _ = BackendExecutor(low).run(task, report, registry)
+    blocked = House2DBackend(seed=1, events=["blocked_transition"]); blocked.initialize(task); blocked.execute("inject_household_events", {}, 5)
+    try: blocked.execute("move_to_room", {"room": "living_room"}, 30); blocked.execute("move_to_room", {"room": "kitchen"}, 30)
+    except BackendError as exc: assert "No legal route" in str(exc)
+    else: raise AssertionError("blocked transition allowed a route")
+    result, _ = BackendExecutor(House2DBackend(seed=1, events=["low_initial_battery"])).run(task, report, registry)
     assert not result.success and "insufficient" in (result.first_failure or "")
     backend = House2DBackend(seed=1); backend.initialize(task); assert backend.emergency_stop()["stopped"]
     try: backend.execute("move_to_room", {"room": "living_room"}, 30)
@@ -61,13 +63,14 @@ def test_timeout_and_observations_keep_ground_truth_separate():
     try: backend.execute("move_to_room", {"room": "kitchen"}, 5)
     except BackendError as exc: assert "exceeding" in str(exc)
     else: raise AssertionError("short movement timeout was accepted")
-    backend.execute("move_to_room", {"room": "living_room"}, 30)
-    observation = backend.execute("inspect_room", {"room": "living_room"}, 20)
+    backend.execute("inject_household_events", {}, 5); backend.execute("move_to_room", {"room": "kitchen"}, 30)
+    observation = backend.execute("inspect_room", {"room": "kitchen"}, 20)
     assert observation["synthetic"] and observation["simulated_onboard_sensor"] and observation["simulation_only"]
     assert observation["physical_robot_validated"] is False and "events" not in observation and observation["observation_valid"] is False
     assert all("observation_dropout" not in event_id for event_id in observation["active_event_identifiers"])
     kitchen_truth = backend.artifact_bundle()["scenario_ground_truth"]["rooms"]["kitchen"]
     assert "static_objects" in kitchen_truth and "static_objects" not in observation
+    backend = House2DBackend(seed=3, events=["unexpected_obstacle", "high_temperature", "high_humidity"]); backend.initialize(task); backend.execute("inject_household_events", {}, 5)
     backend.execute("move_to_room", {"room": "kitchen"}, 30); kitchen = backend.execute("inspect_room", {"room": "kitchen"}, 20)
     assert kitchen["observation_valid"] and kitchen["obstacle_present"] and kitchen["temperature_c"] == 75.0
     backend.execute("move_to_room", {"room": "bathroom"}, 30); bathroom = backend.execute("inspect_room", {"room": "bathroom"}, 20)

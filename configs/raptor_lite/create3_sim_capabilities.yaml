@@ -27,6 +27,33 @@ capabilities:
     execution_adapter: mock
     simulation_supported: true
     physical_robot_supported: false
+  - name: establish_household_baseline
+    description: Establish one observation-backed room baseline for House-Sitter monitoring.
+    parameters: [{name: room, type: string, required: true, allowed_values: [living_room, kitchen, bedroom, bathroom, charging_area]}]
+    required_capabilities: [simulation, house_sitter_monitoring]
+    timeout_seconds: 10
+    safety_constraints: [simulation_only, observation_backed]
+    execution_adapter: mock
+    simulation_supported: true
+    physical_robot_supported: false
+  - name: inject_household_events
+    description: Activate the scenario's controlled simulation-only household events after a baseline patrol.
+    parameters: []
+    required_capabilities: [simulation, house_sitter_monitoring]
+    timeout_seconds: 5
+    safety_constraints: [simulation_only, controlled_event]
+    execution_adapter: mock
+    simulation_supported: true
+    physical_robot_supported: false
+  - name: revisit_active_event_rooms
+    description: Revisit one declared room after controlled events are active.
+    parameters: [{name: room, type: string, required: true, allowed_values: [living_room, kitchen, bedroom, bathroom]}]
+    required_capabilities: [simulation, house_sitter_monitoring]
+    timeout_seconds: 30
+    safety_constraints: [simulation_only, bounded_timeout]
+    execution_adapter: mock
+    simulation_supported: true
+    physical_robot_supported: false
   - name: detect_environment_change
     description: Compare a simulated room observation with its baseline.
     parameters: [{name: room, type: string, required: true, allowed_values: [living_room, kitchen, bedroom, bathroom, charging_area]}]
@@ -49,6 +76,7 @@ capabilities:
     description: Create a structured simulation-only alert.
     parameters:
       - {name: room, type: string, required: true, allowed_values: [living_room, kitchen, bedroom, bathroom, charging_area]}
+      - {name: anomaly_type, type: string, required: true, allowed_values: [detected_anomaly, unexpected_obstacle, high_temperature, high_humidity, blocked_transition, missing_observation]}
       - {name: severity, type: string, required: false, allowed_values: [info, warning, critical], default: warning}
     required_capabilities: [simulation, house_sitter_monitoring]
     timeout_seconds: 10

@@ -56,5 +56,9 @@ class RobotBackend(ABC):
     def stop(self) -> dict[str, Any]:
         return self.emergency_stop()
 
+    def record_failure(self, message: str) -> None:
+        """Allow a report-capable backend to retain an earlier continued failure."""
+        return None
+
     def artifact_bundle(self) -> dict[str, Any]:
         return {}

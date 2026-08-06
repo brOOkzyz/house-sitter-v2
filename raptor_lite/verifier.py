@@ -78,6 +78,43 @@ def verify_task(task: TaskSpec | dict[str, Any], registry: CapabilityRegistry) -
     patrol = "patrol" in parsed.name.casefold() or "house-sitter" in parsed.description.casefold() or "move_to_room" in skills
     if patrol and "return_to_start" not in skills:
         issues.append(_issue(codes.MISSING_SAFE_RETURN, "A patrol task must include return_to_start.", "Add a bounded return_to_start step before stop.", field="steps"))
-    if skills and skills[-1] not in {"stop", "return_to_start"}:
+    if skills and skills[-1] not in {"stop", "return_to_start"} and not (skills[-1] == "generate_monitoring_report" and "stop" in skills[:-1]):
         issues.append(_issue(codes.MISSING_SAFE_RETURN, "The task must end with stop or return_to_start.", "Add stop or return_to_start as the final step.", field="steps"))
+    if "inject_household_events" in skills or "establish_household_baseline" in skills:
+        baselines: set[str] = set(); observed_after_events: set[str] = set(); detected: set[str] = set(); twin_updated: set[str] = set()
+        events_injected = False; report_index: int | None = None
+        for index, step in enumerate(parsed.steps):
+            room = step.parameters.get("room")
+            observation_dependent = step.skill in {"inspect_room", "establish_household_baseline", "detect_environment_change", "update_digital_twin", "generate_alert"}
+            if observation_dependent and step.on_failure == "continue":
+                issues.append(_issue(codes.OBSERVATION_FAILURE_POLICY, "Observation-dependent House-Sitter steps cannot continue after failure.", "Use abort or stop to preserve evidence integrity.", step_id=step.step_id, field="on_failure"))
+            if step.skill in {"record_baseline", "establish_household_baseline"} and isinstance(room, str): baselines.add(room)
+            elif step.skill == "inject_household_events":
+                required_rooms = {"living_room", "kitchen", "bedroom", "bathroom"}
+                if not required_rooms <= baselines:
+                    issues.append(_issue(codes.BASELINE_REQUIRED, "A complete House-Sitter task must baseline all household rooms before event injection.", "Inspect and establish baselines for living_room, kitchen, bedroom, and bathroom first.", step_id=step.step_id, field="steps"))
+                events_injected = True; observed_after_events.clear()
+            elif step.skill == "inspect_room" and events_injected and isinstance(room, str): observed_after_events.add(room)
+            elif step.skill == "detect_environment_change" and isinstance(room, str):
+                if room not in baselines:
+                    issues.append(_issue(codes.BASELINE_REQUIRED, f"Detection for '{room}' has no prior baseline.", "Establish a baseline observation before detection.", step_id=step.step_id, field="parameters.room"))
+                if not events_injected:
+                    issues.append(_issue(codes.EVENT_INJECTION_REQUIRED, "Change detection requires the controlled-event stage.", "Add inject_household_events after the baseline patrol.", step_id=step.step_id, field="steps"))
+                if room not in observed_after_events:
+                    issues.append(_issue(codes.OBSERVATION_REQUIRED, f"Detection for '{room}' requires a post-event inspection.", "Inspect the room after event injection before detection.", step_id=step.step_id, field="parameters.room"))
+                detected.add(room)
+            elif step.skill == "update_digital_twin" and isinstance(room, str):
+                if room not in detected:
+                    issues.append(_issue(codes.DETECTION_REQUIRED, f"Digital Twin update for '{room}' has no prior detection step.", "Run detect_environment_change for this room first.", step_id=step.step_id, field="parameters.room"))
+                else: twin_updated.add(room)
+            elif step.skill == "generate_alert" and isinstance(room, str):
+                if room not in detected:
+                    issues.append(_issue(codes.DETECTION_REQUIRED, f"Alert for '{room}' has no prior detection step.", "Run detect_environment_change for this room first.", step_id=step.step_id, field="parameters.room"))
+                elif room not in twin_updated:
+                    issues.append(_issue(codes.TWIN_UPDATE_REQUIRED, f"Alert for '{room}' must follow its Digital Twin update.", "Update the Digital Twin for this room before generating its alert.", step_id=step.step_id, field="parameters.room"))
+            if step.skill == "generate_monitoring_report": report_index = index
+        if report_index is None:
+            issues.append(_issue(codes.REPORT_ORDER_INVALID, "A complete House-Sitter task requires a monitoring report.", "Add generate_monitoring_report after return_to_start and stop.", field="steps"))
+        elif any(step.skill != "stop" for step in parsed.steps[report_index + 1:]) or "return_to_start" not in skills[:report_index]:
+            issues.append(_issue(codes.REPORT_ORDER_INVALID, "The monitoring report must follow the safe return and be the final task stage.", "Place return_to_start and stop before the final report.", field="steps"))
     return VerificationReport(approved=not issues, issues=issues, resolved_capabilities=sorted(set(resolved)), safety_summary=["simulation_only=true", "execution is denied until verification is approved"])
