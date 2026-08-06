@@ -4,10 +4,12 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from .artifacts import write_run
+from .artifacts import write_planning_run, write_run
 from .capability_registry import CapabilityRegistry
 from .executor import BackendExecutor, MockExecutor
 from .house2d import EVENTS, House2DBackend
+from .models import ExecutionResult, VerificationReport
+from .planner import OfflineHouseSitterPlanner
 from .task_schema import load_task
 from .verifier import verify_task
 
@@ -20,17 +22,65 @@ def _parser() -> argparse.ArgumentParser:
     run = sub.add_parser("run"); run.add_argument("task", type=Path); run.add_argument("--profile", required=True, type=Path)
     run.add_argument("--backend", choices=["mock", "house2d"], default="mock"); run.add_argument("--executor", choices=["mock"])
     run.add_argument("--seed", type=int); run.add_argument("--event", action="append", choices=sorted(EVENTS), default=[]); run.add_argument("--no-events", action="store_true"); run.add_argument("--initial-battery", type=float)
+    for name in ("plan", "run-text"):
+        command = sub.add_parser(name); command.add_argument("--text", required=True); command.add_argument("--profile", required=True, type=Path)
+        if name == "run-text":
+            command.add_argument("--backend", choices=["mock", "house2d"], default="mock"); command.add_argument("--seed", type=int); command.add_argument("--event", action="append", choices=sorted(EVENTS), default=[]); command.add_argument("--no-events", action="store_true"); command.add_argument("--initial-battery", type=float)
     return parser
+
+
+def _execute(task, report, args):
+    backend = None; trace = []
+    if args.backend == "mock":
+        result, trace = MockExecutor().run(task, report, args.registry)
+    else:
+        declared_events = task.metadata.get("scenario_events", [])
+        events = [] if args.no_events else args.event or (declared_events if isinstance(declared_events, list) else [])
+        backend = House2DBackend(seed=args.seed, events=events, initial_battery=args.initial_battery)
+        result, trace = BackendExecutor(backend).run(task, report, args.registry)
+    return result, trace, backend
+
+
+def _print_planning(planning, report, result, output) -> None:
+    print(f"Planning status: {planning.status}")
+    print(f"Interpreted intent: {planning.detected_intent or 'not determined'}")
+    print(f"Extracted rooms: {', '.join(planning.extracted_rooms) or 'none'}")
+    print(f"Extracted checks: {', '.join(planning.extracted_checks) or 'none'}")
+    additions = [f"{step} ({planning.automatic_addition_reasons[step]})" for step in planning.automatically_added_steps]
+    print(f"Automatic safety additions: {', '.join(additions) or 'none'}")
+    if planning.clarification_questions:
+        print(f"Clarification: {' '.join(planning.clarification_questions)}")
+    if planning.unsupported_elements:
+        print(f"Unsupported elements: {', '.join(planning.unsupported_elements)}")
+    print(f"Verification result: {'approved' if report.approved else 'not approved'}")
+    print(f"Execution result: {'success' if result and result.success else 'failed' if result else 'not attempted'}")
+    print(f"Artifact directory: {output}")
 
 
 def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     registry = CapabilityRegistry.from_yaml(args.profile)
+    args.registry = registry
     if args.command == "capabilities":
         print(f"Capability profile: {args.profile}")
         print(f"Declared capabilities: {len(registry.capabilities)}")
         for name in registry.capabilities: print(f"- {name}")
         return 0
+    if args.command in {"plan", "run-text"}:
+        planning = OfflineHouseSitterPlanner(registry).plan(args.text)
+        report = VerificationReport(approved=False, safety_summary=["Planning did not produce a candidate task."])
+        result = None; trace = []; backend = None
+        if planning.status == "planned" and planning.candidate_task is not None:
+            report = verify_task(planning.candidate_task, registry)
+            if args.command == "run-text" and report.approved:
+                result, trace, backend = _execute(planning.candidate_task, report, args)
+        output = write_planning_run(Path("artifacts") / "raptor_lite", planning, registry.as_json(), report, result, trace, backend)
+        _print_planning(planning, report, result, output)
+        if planning.status == "needs_clarification": return 3
+        if planning.status == "unsupported": return 5
+        if planning.status == "invalid": return 6
+        if not report.approved: return 4
+        return 0 if args.command == "plan" or result and result.success else 2
     task = load_task(args.task)
     report = verify_task(task, registry)
     if args.command == "validate":
@@ -47,12 +97,7 @@ def main(argv: list[str] | None = None) -> int:
     if report.approved:
         if args.executor and args.backend != "mock":
             raise ValueError("--executor mock cannot be combined with a non-mock backend.")
-        if args.backend == "mock": result, trace = MockExecutor().run(task, report, registry)
-        else:
-            declared_events = task.metadata.get("scenario_events", [])
-            events = [] if args.no_events else args.event or (declared_events if isinstance(declared_events, list) else [])
-            backend = House2DBackend(seed=args.seed, events=events, initial_battery=args.initial_battery)
-            result, trace = BackendExecutor(backend).run(task, report, registry)
+        result, trace, backend = _execute(task, report, args)
     output = write_run(Path("artifacts") / "raptor_lite", task, registry.as_json(), report, result, trace, backend)
     print(f"Task: {task.name}")
     print(f"Verification result: {'approved' if report.approved else 'rejected'}")

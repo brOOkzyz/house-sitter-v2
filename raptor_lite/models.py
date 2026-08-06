@@ -1,7 +1,7 @@
 """Strict JSON models for the small RaPToR-Lite task core."""
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -64,6 +64,23 @@ class VerificationReport(StrictModel):
     issues: list[VerificationIssue] = Field(default_factory=list)
     resolved_capabilities: list[str] = Field(default_factory=list)
     safety_summary: list[str] = Field(default_factory=list)
+
+
+class PlanningResult(StrictModel):
+    original_text: str
+    normalized_text: str
+    detected_intent: str | None = None
+    extracted_rooms: list[str] = Field(default_factory=list)
+    extracted_checks: list[str] = Field(default_factory=list)
+    candidate_task: TaskSpec | None = None
+    confidence: float = 0.0
+    match_basis: list[str] = Field(default_factory=list)
+    automatically_added_steps: list[str] = Field(default_factory=list)
+    automatic_addition_reasons: dict[str, str] = Field(default_factory=dict)
+    warnings: list[str] = Field(default_factory=list)
+    unsupported_elements: list[str] = Field(default_factory=list)
+    clarification_questions: list[str] = Field(default_factory=list)
+    status: Literal["planned", "needs_clarification", "unsupported", "invalid"]
 
 
 class ExecutionStepResult(StrictModel):
