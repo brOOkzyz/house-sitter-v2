@@ -103,7 +103,14 @@ class OfflineHouseSitterPlanner:
         else:
             for room in rooms:
                 add("move_to_room", room); add("inspect_room", room)
-                if intent == "establish_baseline": add("establish_household_baseline", room)
+                if intent == "establish_baseline":
+                    add("establish_household_baseline", room)
+                elif room != "charging_area":
+                    # House2D supplies a fixed simulation reference; detection still
+                    # consumes only the inspection above, never scenario text.
+                    add("detect_environment_change", room); add("update_digital_twin", room)
+                    alert = self._step(f"{index + 1:02d}-generate-alert-{room}", "generate_alert", room)
+                    alert.parameters["anomaly_type"] = "detected_anomaly"; index += 1; steps.append(alert)
         additions, reasons = self._tail(text, steps)
         return TaskSpec(task_id="nl-house-sitter-v1", name=f"Constrained House-Sitter {intent.replace('_', ' ')}", description="Deterministic simulation-only task created from constrained natural language.", robot_profile="create3_sim", steps=steps, metadata={"simulation_only": True, "physical_robot_supported": False, "planner_name": self.name, "planner_version": self.version, "checks": checks}), additions, reasons
 

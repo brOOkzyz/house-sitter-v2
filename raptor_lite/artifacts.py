@@ -26,6 +26,7 @@ def write_run(root: Path, task: TaskSpec, capabilities: dict[str, Any], report: 
     filenames = {"simulator_config": "simulator_config.json", "scenario_seed": "scenario_seed.json", "scenario_ground_truth": "scenario_ground_truth.json", "initial_world_state": "initial_world_state.json", "final_world_state": "final_world_state.json"}
     for key, filename in filenames.items():
         if key in bundle: dump(output / filename, bundle[key])
+    if "visual_event_manifest" in bundle: dump(output / "visual_event_manifest.json", bundle["visual_event_manifest"])
     for key, filename in (("sensor_observations", "sensor_observations.jsonl"), ("route_trace", "route_trace.jsonl")):
         if key in bundle:
             with (output / filename).open("w", encoding="utf-8") as handle:
@@ -48,7 +49,7 @@ def write_run(root: Path, task: TaskSpec, capabilities: dict[str, Any], report: 
     return output
 
 
-def write_planning_run(root: Path, planning: PlanningResult, capabilities: dict[str, Any], report: VerificationReport | None = None, result: ExecutionResult | None = None, trace: list[ExecutionTrace] | None = None, backend: Any | None = None) -> Path:
+def write_planning_run(root: Path, planning: PlanningResult, capabilities: dict[str, Any], report: VerificationReport | None = None, result: ExecutionResult | None = None, trace: list[ExecutionTrace] | None = None, backend: Any | None = None, *, scenario_input: str | None = None, scenario_plan: dict[str, Any] | None = None, scenario_report: dict[str, Any] | None = None, robot_feedback: dict[str, Any] | None = None, robot_feedback_markdown: str | None = None) -> Path:
     """Persist a planning decision; execution evidence is added only after approval."""
     candidate = planning.candidate_task
     report = report or VerificationReport(approved=False, safety_summary=["No candidate task was submitted to the verifier."])
@@ -64,6 +65,13 @@ def write_planning_run(root: Path, planning: PlanningResult, capabilities: dict[
     dump = lambda path, value: path.write_text(json.dumps(value, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     dump(output / "natural_language_input.json", {"original_text": planning.original_text, "normalized_text": planning.normalized_text})
     dump(output / "planning_result.json", planning.model_dump(mode="json"))
+    if scenario_input is not None: dump(output / "natural_language_scenario_input.json", {"original_text": scenario_input, "normalized_text": (scenario_plan or {}).get("normalized_text", "")})
+    if scenario_plan is not None:
+        dump(output / "scenario_planning_result.json", scenario_plan)
+        dump(output / "candidate_scenario.json", scenario_plan.get("candidate_scenario"))
+    if scenario_report is not None: dump(output / "scenario_verification_report.json", scenario_report)
+    if robot_feedback is not None: dump(output / "robot_feedback.json", robot_feedback)
+    if robot_feedback_markdown is not None: (output / "robot_feedback.md").write_text(robot_feedback_markdown, encoding="utf-8")
     if candidate is not None:
         dump(output / "candidate_task.json", candidate.model_dump(mode="json"))
         from .planner import normalized_task

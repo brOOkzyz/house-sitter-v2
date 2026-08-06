@@ -9,6 +9,7 @@ from typing import Any
 from .backends import BackendError, RobotBackend
 from .house_sitter import HouseSitterApplication
 from .models import TaskSpec
+from .scenario import verify_scenario
 
 
 ROOMS = {
@@ -79,13 +80,18 @@ class House2DBackend(RobotBackend):
     name = "house2d"
     version = "1.0"
 
-    def __init__(self, seed: int | None = None, events: list[str] | None = None, initial_battery: float | None = None, sensor_noise_bound: float = 0.0):
+    def __init__(self, seed: int | None = None, events: list[str] | None = None, initial_battery: float | None = None, sensor_noise_bound: float = 0.0, scenario: dict[str, Any] | None = None):
         self.seed = seed if seed is not None else random.SystemRandom().randrange(1, 2**31)
         self.requested_events = list(events or [])
         unknown = set(self.requested_events) - EVENTS
         if unknown:
             raise ValueError(f"Unknown house2d event: {sorted(unknown)[0]}")
         self.requested_battery = initial_battery
+        self.scenario = deepcopy(scenario) if scenario is not None else None
+        if self.scenario is not None and self.scenario.get("validation_status") != "approved":
+            raise ValueError("House2D refuses an unverified scenario.")
+        if self.scenario is not None and not verify_scenario({"status": "planned", "candidate_scenario": self.scenario}).get("approved"):
+            raise ValueError("House2D refuses an invalid scenario.")
         self.sensor_noise_bound = max(0.0, float(sensor_noise_bound))
         self._rng = random.Random(self.seed)
         self._state: dict[str, Any] = {}
@@ -101,7 +107,8 @@ class House2DBackend(RobotBackend):
     def initialize(self, task: TaskSpec) -> None:
         self._rng = random.Random(self.seed)
         battery = self.requested_battery if self.requested_battery is not None else float(self._rng.randint(82, 96))
-        if "low_initial_battery" in self.requested_events:
+        scenario_events = list((self.scenario or {}).get("events", []))
+        if "low_initial_battery" in self.requested_events or any(item.get("event_type") == "low_initial_battery" for item in scenario_events):
             battery = min(battery, 5.0)
         rooms = {}
         for room in ROOMS:
@@ -111,17 +118,35 @@ class House2DBackend(RobotBackend):
                 "static_objects": [f"{room}_furniture_{self._rng.randint(1, 99)}"],
             }
         event_records = []
-        for index, kind in enumerate(self.requested_events, 1):
-            room = "kitchen" if kind in {"unexpected_obstacle", "high_temperature", "observation_dropout", "transient_false_reading"} else "bathroom" if kind == "high_humidity" else "living_room"
-            parameters = {"doors": [["living_room", "kitchen"], ["bathroom", "kitchen"]]} if kind == "blocked_transition" else {}
-            event_records.append({"event_id": f"event_{index:03d}", "type": kind, "room": room, "timestamp": None, "parameters": parameters})
-        self._ground_truth = {"seed": self.seed, "rooms": rooms, "events": event_records, "doors": [list(door) for door in DOORS]}
+        if self.scenario is not None:
+            for item in scenario_events:
+                event_records.append({"event_id": item["event_id"], "type": item["event_type"], "room": item["room"], "timestamp": 0.0,
+                                      "parameters": deepcopy(item["parameters"]), "visual_representation": deepcopy(item["visual_representation"]), "simulation_only": True})
+            low = next((item for item in event_records if item["type"] == "low_initial_battery"), None)
+            if low: battery = min(battery, float(low["parameters"]["battery_percent"]))
+        else:
+            for index, kind in enumerate(self.requested_events, 1):
+                room = "kitchen" if kind in {"unexpected_obstacle", "high_temperature", "observation_dropout", "transient_false_reading"} else "bathroom" if kind == "high_humidity" else "living_room"
+                parameters = {"doors": [["living_room", "kitchen"], ["bathroom", "kitchen"]]} if kind == "blocked_transition" else {}
+                event_records.append({"event_id": f"event_{index:03d}", "type": kind, "room": room, "timestamp": None, "parameters": parameters})
+        self._ground_truth = {"seed": self.seed, "rooms": rooms, "events": event_records, "doors": [list(door) for door in DOORS], "simulation_only": True, "physical_robot_validated": False}
         self._state = {"room": "charging_area", "pose": list(ROOMS["charging_area"]["center"]), "battery": float(battery), "time": 0.0, "stopped": False, "visit_history": ["charging_area"], "baselines": {}, "twin": {}, "alerts": []}
         self._initial = deepcopy(self.current_robot_state())
         self._observations, self._routes = [], []
-        self._events_active, self._transient_used = False, False
+        self._events_active, self._transient_used = self.scenario is not None and not any(step.skill == "inject_household_events" for step in task.steps), False
         self._execution_failures = []
         self._application = HouseSitterApplication(task.name, self.seed)
+        if self.scenario is not None:
+            # Reference state is internal simulation configuration.  Runtime
+            # detection below still receives only actual onboard observations.
+            for room, truth in rooms.items():
+                reference = {"observation_id": f"reference:{room}:{self.seed}", "room": room, "timestamp": 0.0,
+                             "visible_object_identifiers": list(truth["static_objects"]), "obstacle_present": False,
+                             "temperature_c": truth["temperature_c"], "humidity_percent": truth["humidity_percent"],
+                             "transition_accessibility": {neighbor: True for a, b in DOORS for neighbor in ([b] if a == room else [a] if b == room else [])},
+                             "observation_valid": True}
+                self._application.observe(reference, baseline=True)
+            self._application.capture_before()
 
     def available_capabilities(self) -> set[str]:
         return set(ALL_SKILLS)
@@ -203,8 +228,8 @@ class House2DBackend(RobotBackend):
             "observation_id": f"observation:{room}:{len(self._observations)+1}:{self._state['time']:.3f}",
             "room": room, "timestamp": self._state["time"], "robot_state": {"room": room, "pose": list(self._state["pose"]), "battery": self._state["battery"]}, "visit_index": len(self._state["visit_history"]),
             "visible_object_identifiers": [] if dropout else visible, "obstacle_present": None if dropout else any(item["type"] == "unexpected_obstacle" for item in events),
-            "temperature_c": None if dropout else (75.0 if any(item["type"] == "high_temperature" for item in events) else truth["temperature_c"] + noise + (12.0 if transient else 0.0)),
-            "humidity_percent": None if dropout else (92.0 if any(item["type"] == "high_humidity" for item in events) else truth["humidity_percent"] + noise),
+            "temperature_c": None if dropout else (next((item["parameters"].get("temperature_c", 75.0) for item in events if item["type"] == "high_temperature"), truth["temperature_c"] + noise + (12.0 if transient else 0.0))),
+            "humidity_percent": None if dropout else (next((item["parameters"].get("humidity_percent", 92.0) for item in events if item["type"] == "high_humidity"), truth["humidity_percent"] + noise)),
             "transition_accessibility": {} if dropout else accessibility,
             "battery": self._state["battery"], "active_event_identifiers": [item["event_id"] for item in events], "observation_valid": not dropout,
             "synthetic": True, "simulated_onboard_sensor": True, "simulation_only": True, "physical_robot_validated": False, "scenario_seed": self.seed,
@@ -267,6 +292,6 @@ class House2DBackend(RobotBackend):
         application = self._application.artifacts() if self._application is not None else {}
         return {
             "simulator_config": {"backend_name": self.name, "backend_version": self.version, "rooms": ROOMS, "doors": [list(item) for item in DOORS], "movement_seconds_per_door": 5.0, "battery_per_door": 4.0, "sensor_noise_bound": self.sensor_noise_bound, "simulation_only": True, "physical_robot_validated": False},
-            "scenario_seed": {"seed": self.seed}, "scenario_ground_truth": deepcopy(self._ground_truth), "initial_world_state": deepcopy(self._initial), "final_world_state": self.current_robot_state(),
+            "scenario_seed": {"seed": self.seed}, "scenario_ground_truth": deepcopy(self._ground_truth), "visual_event_manifest": {"events": [{"event_id": item["event_id"], "room": item["room"], "event_type": item["type"], "parameters": deepcopy(item.get("parameters", {})), "visual_representation": item.get("visual_representation", {"icon": "event", "label": item["type"]}), "simulation_only": True} for item in self._ground_truth.get("events", [])], "simulation_only": True}, "initial_world_state": deepcopy(self._initial), "final_world_state": self.current_robot_state(),
             "sensor_observations": self.observations(), "route_trace": deepcopy(self._routes), **application,
         }

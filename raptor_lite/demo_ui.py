@@ -17,17 +17,13 @@ from .executor import BackendExecutor, MockExecutor
 from .house2d import DOORS, HOUSE_LAYOUT, ROOMS, House2DBackend, layout_location, layout_route
 from .models import PlanningResult, VerificationReport
 from .planner import OfflineHouseSitterPlanner
+from .robot_feedback import build_feedback, feedback_markdown
+from .scenario import plan_scenario, verify_scenario
 from .verifier import verify_task
 
 
 DEFAULT_REQUEST = "Run a complete house-sitter patrol and report any environmental changes."
-SCENARIOS = {
-    "complete": {"events": ["unexpected_obstacle", "high_humidity"], "label": "Kitchen obstacle and bathroom humidity"},
-    "normal": {"events": [], "label": "Normal patrol"},
-    "dropout": {"events": ["observation_dropout"], "label": "Kitchen observation dropout"},
-    "blocked": {"events": ["blocked_transition"], "label": "Blocked transition"},
-    "low_battery": {"events": ["low_initial_battery"], "label": "Low initial battery"},
-}
+LEGACY_SCENARIO_TEXT = {"complete": "There is a box in the kitchen and the bathroom has high humidity.", "normal": "The home is normal.", "dropout": "The kitchen sensor observation is unavailable.", "blocked": "The kitchen doorway is blocked.", "low_battery": "The available battery is low."}
 
 
 class DemoError(ValueError):
@@ -70,6 +66,9 @@ class DemoController:
             if getattr(self, "_busy", False):
                 raise DemoError("Cannot reset while a simulation run is in progress.")
             self.planning: PlanningResult | None = None
+            self.scenario_planning: dict[str, Any] | None = None
+            self.scenario_report: dict[str, Any] | None = None
+            self.scenario_input: str | None = None
             self.report: VerificationReport | None = None
             self.result = None
             self.trace: list[Any] = []
@@ -95,32 +94,58 @@ class DemoController:
             finally:
                 self._end()
 
+    def interpret_scenario(self, text: Any, seed: Any) -> dict[str, Any]:
+        with self._lock:
+            self._begin()
+            try:
+                scenario_text, parsed_seed = self._text(text), self._seed(seed)
+                self.scenario_input = scenario_text
+                self.scenario_planning = plan_scenario(scenario_text, parsed_seed)
+                self.scenario_report = verify_scenario(self.scenario_planning)
+                self.result = None; self.trace = []; self.playback_trace = []; self.bundle = {}; self.artifact_dir = None
+                self.index = 0; self.paused = True; self.started = False; self.explicitly_paused = False
+                self.phase = "scenario_planned" if self.scenario_report["approved"] else "scenario_rejected"
+                return self.state()
+            finally:
+                self._end()
+
     def validate(self) -> dict[str, Any]:
         with self._lock:
             if self.planning is None:
                 raise DemoError("Plan a natural-language request before validation.")
+            if self.scenario_planning is None:
+                self.scenario_input = LEGACY_SCENARIO_TEXT["normal"]
+                self.scenario_planning = plan_scenario(self.scenario_input, 0); self.scenario_report = verify_scenario(self.scenario_planning)
             self.report = verify_task(self.planning.candidate_task, self.registry) if self.planning.status == "planned" and self.planning.candidate_task else VerificationReport(approved=False, safety_summary=["No planned candidate task is available for validation."])
+            if not self.scenario_report or not self.scenario_report["approved"]: self.report = VerificationReport(approved=False, safety_summary=["Scenario verification must approve the structured scenario before execution."])
             self.phase = "approved" if self.report.approved else "rejected"
             return self.state()
 
-    def _run(self, seed: int, scenario: str) -> dict[str, Any]:
+    def _run(self, seed: int, scenario: str | None = None) -> dict[str, Any]:
         if self.planning is None or self.report is None or not self.report.approved or self.planning.candidate_task is None:
             raise DemoError("Execution is denied until a candidate task is verifier-approved.")
-        if scenario not in SCENARIOS:
-            raise DemoError("Scenario is not supported by this local demo.")
-        backend = House2DBackend(seed=seed, events=SCENARIOS[scenario]["events"])
+        if scenario is not None:
+            if scenario not in LEGACY_SCENARIO_TEXT: raise DemoError("Scenario is not supported by this local demo.")
+            self.scenario_input = LEGACY_SCENARIO_TEXT[scenario]; self.scenario_planning = plan_scenario(self.scenario_input, seed); self.scenario_report = verify_scenario(self.scenario_planning)
+            if not self.scenario_report["approved"]: raise DemoError("Scenario verification did not approve this scenario.")
+        elif self.scenario_input is not None and self.scenario_planning and self.scenario_planning.get("scenario_seed") != seed:
+            self.scenario_planning = plan_scenario(self.scenario_input, seed); self.scenario_report = verify_scenario(self.scenario_planning)
+        if not self.scenario_planning or not self.scenario_report or not self.scenario_report["approved"]: raise DemoError("Execution is denied until a scenario is verified.")
+        backend = House2DBackend(seed=seed, scenario={**self.scenario_planning["candidate_scenario"], "validation_status": "approved"})
         self.result, self.trace = BackendExecutor(backend).run(self.planning.candidate_task, self.report, self.registry)
         self.bundle = backend.artifact_bundle()
+        feedback = build_feedback(self.planning.extracted_rooms, self.trace, self.bundle, execution_success=self.result.success)
+        self.bundle["robot_feedback"] = feedback
         self.playback_trace = self._expand_playback_trace()
-        self.artifact_dir = write_planning_run(self.artifact_root, self.planning, self.registry.as_json(), self.report, self.result, self.trace, backend)
+        self.artifact_dir = write_planning_run(self.artifact_root, self.planning, self.registry.as_json(), self.report, self.result, self.trace, backend, scenario_input=self.scenario_input, scenario_plan=self.scenario_planning, scenario_report=self.scenario_report, robot_feedback=feedback, robot_feedback_markdown=feedback_markdown(feedback))
         self.index = 0; self.paused = True; self.started = False; self.explicitly_paused = False; self.phase = "playback" if self.result.success else "failed"
         return self.state()
 
-    def run(self, seed: Any, scenario: str) -> dict[str, Any]:
+    def run(self, seed: Any, scenario: str | None = None) -> dict[str, Any]:
         with self._lock:
             self._begin()
             try:
-                return self._run(self._seed(seed), str(scenario))
+                return self._run(self._seed(seed), scenario)
             finally:
                 self._end()
 
@@ -129,9 +154,10 @@ class DemoController:
             self._begin()
             try:
                 self.planning = self.planner.plan(DEFAULT_REQUEST)
+                self.scenario_input = LEGACY_SCENARIO_TEXT["complete"]; self.scenario_planning = plan_scenario(self.scenario_input, self._seed(seed)); self.scenario_report = verify_scenario(self.scenario_planning)
                 self.report = verify_task(self.planning.candidate_task, self.registry) if self.planning.candidate_task else VerificationReport(approved=False)
                 self.phase = "approved" if self.report.approved else "rejected"
-                return self._run(self._seed(seed), "complete")
+                return self._run(self._seed(seed))
             finally:
                 self._end()
 
@@ -211,7 +237,7 @@ class DemoController:
         initial = self.bundle.get("initial_world_state", {"room": "charging_area", "pose": [1.0, 1.0], "battery": None, "time": 0.0, "visit_history": ["charging_area"]})
         visual = self.playback_trace[self.index - 1] if self.index else {"trace_count": 0, "position": list(HOUSE_LAYOUT["checkpoints"]["charging_area"]), "action": "Ready to start", "goal": None, "waypoint": "charging_area", "phase": "Baseline patrol", "observation_status": "Waiting", "logs": []}
         trace_count = visual["trace_count"]
-        frame = {"current_room": layout_location(visual["position"]), "pose": visual["position"], "battery": initial.get("battery"), "simulation_time": initial.get("time", 0.0), "visited_rooms": list(initial.get("visit_history", [])), "routes": [], "events": [], "observations": [], "anomalies": [], "twin_updates": [], "alerts": [], "report": None, "stopped": False, "task_phase": "ready", "trace_count": trace_count, "playback_action": visual["action"], "goal": visual["goal"], "waypoint": visual["waypoint"], "patrol_phase": visual["phase"], "observation_status": visual["observation_status"], "travelled_path": [entry["position"] for entry in self.playback_trace[:self.index]], "planned_path": []}
+        frame = {"current_room": layout_location(visual["position"]), "pose": visual["position"], "battery": initial.get("battery"), "simulation_time": initial.get("time", 0.0), "visited_rooms": list(initial.get("visit_history", [])), "routes": [], "events": [], "visual_events": self.bundle.get("visual_event_manifest", {}).get("events", []), "observations": [], "anomalies": [], "twin_updates": [], "alerts": [], "report": None, "stopped": False, "task_phase": "ready", "trace_count": trace_count, "playback_action": visual["action"], "goal": visual["goal"], "waypoint": visual["waypoint"], "patrol_phase": visual["phase"], "observation_status": visual["observation_status"], "travelled_path": [entry["position"] for entry in self.playback_trace[:self.index]], "planned_path": []}
         event_records = self.bundle.get("scenario_ground_truth", {}).get("events", [])
         if self.index < len(self.playback_trace):
             frame["planned_path"] = [entry["position"] for entry in self.playback_trace[self.index:] if entry.get("goal") == visual.get("goal")][:32]
@@ -337,7 +363,9 @@ class DemoController:
         with self._lock:
             frame = self._frame()
             world = {**self.bundle.get("simulator_config", {"rooms": ROOMS, "doors": [list(item) for item in DOORS]}), "layout": HOUSE_LAYOUT}
-            return {"phase": self.phase, "busy": self._busy, "planning": self.planning.model_dump(mode="json") if self.planning else None, "verification": self.report.model_dump(mode="json") if self.report else None, "execution": self.result.model_dump(mode="json") if self.result else None, "playback": {"index": self.index, "total": len(self.playback_trace), "paused": self.paused, "speed": self.speed, "frame": frame}, "summary": self._summary(frame), "world": world, "digital_twin_before": self.bundle.get("digital_twin_before"), "digital_twin_current": self._visible_twin(frame), "artifact_directory": str(self.artifact_dir) if self.artifact_dir else None, "artifact_files": self._artifact_files(), "simulation_only": True, "physical_robot_validated": False}
+            feedback = build_feedback(self.planning.extracted_rooms if self.planning else [], self.trace, self.bundle, trace_count=frame["trace_count"], execution_success=None) if self.bundle else None
+            if self.index == len(self.playback_trace) and self.bundle: feedback = self.bundle.get("robot_feedback")
+            return {"phase": self.phase, "busy": self._busy, "planning": self.planning.model_dump(mode="json") if self.planning else None, "scenario_planning": self.scenario_planning, "scenario_verification": self.scenario_report, "verification": self.report.model_dump(mode="json") if self.report else None, "execution": self.result.model_dump(mode="json") if self.result else None, "robot_feedback": feedback, "playback": {"index": self.index, "total": len(self.playback_trace), "paused": self.paused, "speed": self.speed, "frame": frame}, "summary": self._summary(frame), "world": world, "digital_twin_before": self.bundle.get("digital_twin_before"), "digital_twin_current": self._visible_twin(frame), "artifact_directory": str(self.artifact_dir) if self.artifact_dir else None, "artifact_files": self._artifact_files(), "simulation_only": True, "physical_robot_validated": False}
 
     def artifact(self, name: str) -> dict[str, Any]:
         with self._lock:
@@ -365,9 +393,9 @@ body{font:14px system-ui,sans-serif;margin:0;background:#f4f6f8;color:#17212b}he
 <body><header><b>RaPToR-Lite House-Sitter Demo</b><span class="boundary"> simulation-only — physical robot validation not performed</span></header>
 <div id="app-status" data-state="loading" role="status">Loading interface…</div>
 <main>
-<section><h2>Task Creation</h2><textarea id="text">Run a complete house-sitter patrol and report any environmental changes.</textarea><label>Seed <input id="seed" type="number" value="12345" min="0" max="2147483647"></label><label>Scenario <select id="scenario"><option value="complete">Kitchen obstacle + bathroom humidity</option><option value="normal">Normal</option><option value="dropout">Observation dropout</option><option value="blocked">Blocked transition</option><option value="low_battery">Low battery</option></select></label><div class="row"><button id="plan-button">Plan</button><button id="validate-button">Validate</button><button id="run-button" disabled>Run</button><button id="complete-button">Run Complete House-Sitter Demo</button><button id="reset-button">Reset</button></div><h3>Planning Result</h3><pre id="planning"></pre><h3>Verification</h3><pre id="verify"></pre></section>
+<section><h2>Task Creation</h2><label>Robot Task</label><textarea id="task-text">Patrol the bedroom and tell me whether anything is wrong.</textarea><label>Household Scenario</label><textarea id="scenario-text">The bedroom is normal.</textarea><label>Seed <input id="seed" type="number" value="12345" min="0" max="2147483647"></label><div class="row"><button id="interpret-button">Interpret Scenario</button><button id="plan-button">Plan Task</button><button id="validate-button">Validate</button><button id="run-button" disabled>Run</button><button id="reset-button">Reset</button></div><small>Example: There is a box in the bedroom and the bathroom has high humidity.</small><details><summary>Technical planning evidence</summary><h3>Task Planning Result</h3><pre id="planning"></pre><h3>Scenario Planning Result</h3><pre id="scenario-planning"></pre><h3>Task Verification</h3><pre id="verify"></pre><h3>Scenario Verification</h3><pre id="scenario-verify"></pre></details></section>
 <section><h2>Household Simulation</h2><svg id="map" viewBox="0 0 720 520" width="100%" aria-label="House2D replay"></svg><div class="legend"><span class="planned-key">planned route</span><span class="travelled-key">travelled route</span><span class="event-key">physical event / confirmed change</span></div><div class="row"><button id="pause-button">Pause</button><button id="resume-button">Resume</button><button id="step-button">Step</button><button id="restart-button">Restart</button><button id="faster-button">Run faster</button></div><pre id="status"></pre><h3>Sensor Observations</h3><pre id="observations"></pre></section>
-<section><h2>System Evidence</h2><h3>Candidate Task</h3><pre id="task"></pre><h3>Capability Match</h3><pre id="caps"></pre><article class="summary" aria-labelledby="summary-heading"><h3 id="summary-heading">Live Demo Summary</h3><dl id="summary-fields" class="summary-grid"></dl><h4>Activity Log</h4><ol id="activity-log" class="activity-log" aria-live="polite"></ol></article><h3>Detected Anomalies / Alerts</h3><pre id="alerts"></pre><h3>Digital Twin Diff</h3><pre id="twin"></pre><h3>Monitoring Report</h3><pre id="report"></pre><h3>Artifacts</h3><div id="files"></div><pre id="file"></pre></section>
+<section><h2>Robot Feedback</h2><pre id="feedback"></pre><h3>Detected Anomalies / Alerts</h3><pre id="alerts"></pre><h3>Digital Twin Diff</h3><pre id="twin"></pre><h3>Monitoring Report</h3><pre id="report"></pre><article class="summary" aria-labelledby="summary-heading"><h3 id="summary-heading">Live Demo Summary</h3><dl id="summary-fields" class="summary-grid"></dl><h4>Activity Log</h4><ol id="activity-log" class="activity-log" aria-live="polite"></ol></article><details><summary>Technical evidence</summary><h3>Candidate Task</h3><pre id="task"></pre><h3>Capability Match</h3><pre id="caps"></pre><h3>Artifacts</h3><div id="files"></div><pre id="file"></pre></details></section>
 </main>
 <script>window.raptorDemo={initialized:false,lastError:null};window.addEventListener("error",function(event){var status=document.getElementById("app-status");window.raptorDemo.lastError=event.message;status.textContent="JavaScript error: "+event.message;status.dataset.state="error";});</script>
 <script src="/app.js"></script></body></html>"""
@@ -396,9 +424,9 @@ def _script() -> str:
     if (!response.ok) throw new Error(payload.error || "The demo request failed.");
     return payload;
   }
-  const taskText = () => byId("text").value;
+  const taskText = () => byId("task-text").value;
+  const scenarioText = () => byId("scenario-text").value;
   const seed = () => Number(byId("seed").value);
-  const scenario = () => byId("scenario").value;
   async function perform(message, path, body, completed) {
     setStatus(message);
     try {
@@ -409,10 +437,11 @@ def _script() -> str:
       setStatus("Request failed: " + error.message, "error");
     }
   }
-  const plan = () => perform("Planning request…", "/api/plan", {text: taskText()}, "Plan is ready.");
+  const interpret = () => perform("Interpreting scenario…", "/api/interpret-scenario", {text: scenarioText(), seed: seed()}, "Scenario interpretation is ready.");
+  const plan = () => perform("Planning task…", "/api/plan", {text: taskText()}, "Task plan is ready.");
   const validate = () => perform("Validating candidate task…", "/api/validate", {}, "Verification is complete.");
-  const run = () => perform("Executing approved task…", "/api/run", {seed: seed(), scenario: scenario()}, "Execution trace is ready.");
-  const complete = () => perform("Preparing demonstration…", "/api/demo", {seed: seed()}, "Demonstration trace is ready.");
+  const run = () => perform("Executing approved task…", "/api/run", {seed: seed()}, "Execution trace is ready.");
+  // Preparing demonstration… remains available through the localhost API for legacy automation.
   const reset = () => perform("Resetting demonstration…", "/api/reset", {}, "Demonstration has been reset.");
   const playback = (action) => perform("Updating replay…", "/api/playback", {action}, "Replay updated.");
   async function tick() {
@@ -443,7 +472,7 @@ def _script() -> str:
     const polyline = (positions, className) => { if (positions?.length > 1) svg.append(node("polyline", {points: positions.map((position) => point(position).join(",")).join(" "), class: className})); };
     polyline(frame.planned_path, "planned");
     polyline(frame.travelled_path, "route");
-    (frame.events || []).filter((event) => event.type === "unexpected_obstacle" && event.room === "kitchen").forEach(() => { const [x, y] = point([10.6, 3.7]); svg.append(node("rect", {x: x - 9, y: y - 9, width: 18, height: 18, class: "event"})); });
+    (frame.visual_events || []).forEach((event) => { const room = layout.rooms[event.room]; if (!room) return; const [left,bottom,right,top] = room.bounds; const relative = event.parameters?.position || [0.82,0.78]; const [x,y] = point([left + (right-left)*relative[0], bottom + (top-bottom)*relative[1]]); const icon = event.visual_representation?.icon; const confirmed = (frame.anomalies || []).some((item) => item.room === event.room && item.anomaly_type === event.event_type); if (icon === "box") svg.append(node("rect", {x:x-9,y:y-9,width:18,height:18,class:"event"})); else svg.append(node("text", {x:x-9,y:y+7,class:"anomaly-label"}, icon === "droplet" ? "💧" : icon === "thermometer" ? "🌡" : icon === "barrier" ? "⛔" : icon === "sensor_unknown" ? "?" : "▱")); if (confirmed) svg.append(node("text", {x:x-18,y:y-13,class:"anomaly-label"}, "detected")); });
     (frame.anomalies || []).forEach((anomaly, index) => { const checkpoint = layout.checkpoints[anomaly.room]; if (!checkpoint) return; const [x, y] = point(checkpoint); svg.append(node("text", {x: x + 12, y: y - 16 - index * 14, class: "anomaly-label"}, anomaly.anomaly_type.replaceAll("_", " "))); });
     const robot = point(frame.pose || layout.checkpoints.charging_area);
     svg.append(node("circle", {cx: robot[0], cy: robot[1], r: 12, class: "robot"}));
@@ -469,6 +498,8 @@ def _script() -> str:
     state = snapshot;
     const planning = snapshot.planning || {};
     show("planning", {status: planning.status, intent: planning.detected_intent, rooms: planning.extracted_rooms, checks: planning.extracted_checks, automatic_safety: planning.automatic_addition_reasons, warnings: planning.warnings, clarification: planning.clarification_questions, unsupported: planning.unsupported_elements});
+    show("scenario-planning", snapshot.scenario_planning || {message: "Interpret a household scenario first."});
+    show("scenario-verify", snapshot.scenario_verification || {message: "No scenario verification yet."});
     show("verify", snapshot.verification || {message: "Plan before validation"});
     show("task", planning.candidate_task || {});
     show("caps", {resolved_capabilities: snapshot.verification?.resolved_capabilities, safety_summary: snapshot.verification?.safety_summary});
@@ -479,6 +510,7 @@ def _script() -> str:
     show("observations", frame.observations || []);
     show("alerts", {anomalies: frame.anomalies || [], alerts: frame.alerts || []});
     show("twin", {baseline: snapshot.digital_twin_before, current: snapshot.digital_twin_current, updates: frame.twin_updates || []});
+    byId("feedback").textContent = snapshot.robot_feedback?.final_message || "Robot feedback will be based on completed observations.";
     byId("report").textContent = frame.report || "";
     byId("run-button").disabled = !(snapshot.verification && snapshot.verification.approved);
     const files = byId("files");
@@ -494,10 +526,10 @@ def _script() -> str:
     });
     draw(snapshot);
   }
+  byId("interpret-button").addEventListener("click", interpret);
   byId("plan-button").addEventListener("click", plan);
   byId("validate-button").addEventListener("click", validate);
   byId("run-button").addEventListener("click", run);
-  byId("complete-button").addEventListener("click", complete);
   byId("reset-button").addEventListener("click", reset);
   byId("pause-button").addEventListener("click", () => playback("pause"));
   byId("resume-button").addEventListener("click", () => playback("resume"));
@@ -547,6 +579,7 @@ def make_server(controller: DemoController, host: str = "127.0.0.1", port: int =
                 body = self._body()
                 action = urlparse(self.path).path
                 if action == "/api/plan": output = controller.plan(body.get("text"))
+                elif action == "/api/interpret-scenario": output = controller.interpret_scenario(body.get("text"), body.get("seed"))
                 elif action == "/api/validate": output = controller.validate()
                 elif action == "/api/run": output = controller.run(body.get("seed"), body.get("scenario"))
                 elif action == "/api/demo": output = controller.complete_demo(body.get("seed", 12345))
