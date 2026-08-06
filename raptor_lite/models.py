@@ -78,6 +78,8 @@ class ExecutionResult(StrictModel):
     success: bool
     step_results: list[ExecutionStepResult] = Field(default_factory=list)
     first_failure: str | None = None
+    start_timestamp: str | None = None
+    end_timestamp: str | None = None
 
 
 class ExecutionTrace(StrictModel):

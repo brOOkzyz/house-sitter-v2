@@ -10,7 +10,7 @@ from raptor_lite.artifacts import write_run
 from raptor_lite.capability_registry import CapabilityRegistry
 from raptor_lite.executor import MockExecutor
 from raptor_lite import issue_codes as codes
-from raptor_lite.models import TaskSpec
+from raptor_lite.models import TaskSpec, VerificationReport
 from raptor_lite.task_schema import load_task
 from raptor_lite.verifier import verify_task
 
@@ -34,7 +34,7 @@ def test_registry_and_json_round_trip_are_strict():
 def test_valid_house_sitter_task_is_approved_and_executes_in_order():
     task = TaskSpec.model_validate(valid_data()); report = verify_task(task, CapabilityRegistry.from_yaml(PROFILE))
     assert report.approved and not report.issues
-    result, trace = MockExecutor().run(task, report)
+    result, trace = MockExecutor().run(task, report, CapabilityRegistry.from_yaml(PROFILE))
     assert result.success
     assert [item.skill for item in result.step_results] == [item.skill for item in task.steps]
     assert len(trace) == len(task.steps)
@@ -71,12 +71,17 @@ def test_executor_refuses_unverified_task_and_artifacts_are_complete():
     registry = CapabilityRegistry.from_yaml(PROFILE)
     task = load_task(EXAMPLES / "invalid_unsupported_skill.json"); report = verify_task(task, registry)
     try:
-        MockExecutor().run(task, report)
+        MockExecutor().run(task, report, registry)
     except ValueError as exc:
         assert "refused" in str(exc)
     else: raise AssertionError("executor accepted a rejected task")
+    try:
+        MockExecutor().run(task, VerificationReport(approved=True), registry)
+    except ValueError as exc:
+        assert "refused" in str(exc)
+    else: raise AssertionError("executor trusted a forged approval report")
     valid = load_task(EXAMPLES / "valid_house_sitter_task.json"); approved = verify_task(valid, registry)
-    result, trace = MockExecutor().run(valid, approved)
+    result, trace = MockExecutor().run(valid, approved, registry)
     with tempfile.TemporaryDirectory() as directory:
         output = write_run(Path(directory), valid, registry.as_json(), approved, result, trace)
         for name in ("input_task.json", "robot_capabilities.json", "verification_report.json", "resolved_task.json", "execution_trace.jsonl", "execution_result.json", "demo_summary.json"):

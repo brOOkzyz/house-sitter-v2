@@ -6,7 +6,8 @@ from pathlib import Path
 
 from .artifacts import write_run
 from .capability_registry import CapabilityRegistry
-from .executor import MockExecutor
+from .executor import BackendExecutor, MockExecutor
+from .house2d import EVENTS, House2DBackend
 from .task_schema import load_task
 from .verifier import verify_task
 
@@ -16,7 +17,9 @@ def _parser() -> argparse.ArgumentParser:
     sub = parser.add_subparsers(dest="command", required=True)
     for name in ("capabilities", "validate"):
         command = sub.add_parser(name); command.add_argument("task", nargs="?" if name == "capabilities" else None, type=Path); command.add_argument("--profile", required=True, type=Path)
-    run = sub.add_parser("run"); run.add_argument("task", type=Path); run.add_argument("--profile", required=True, type=Path); run.add_argument("--executor", choices=["mock"], required=True)
+    run = sub.add_parser("run"); run.add_argument("task", type=Path); run.add_argument("--profile", required=True, type=Path)
+    run.add_argument("--backend", choices=["mock", "house2d"], default="mock"); run.add_argument("--executor", choices=["mock"])
+    run.add_argument("--seed", type=int); run.add_argument("--event", action="append", choices=sorted(EVENTS), default=[]); run.add_argument("--initial-battery", type=float)
     return parser
 
 
@@ -40,12 +43,20 @@ def main(argv: list[str] | None = None) -> int:
         print(f"Artifact directory: {output}")
         return 0 if report.approved else 2
     result = None; trace = []
+    backend = None
     if report.approved:
-        result, trace = MockExecutor().run(task, report)
-    output = write_run(Path("artifacts") / "raptor_lite", task, registry.as_json(), report, result, trace)
+        if args.executor and args.backend != "mock":
+            raise ValueError("--executor mock cannot be combined with a non-mock backend.")
+        if args.backend == "mock": result, trace = MockExecutor().run(task, report, registry)
+        else:
+            backend = House2DBackend(seed=args.seed, events=args.event, initial_battery=args.initial_battery)
+            result, trace = BackendExecutor(backend).run(task, report, registry)
+    output = write_run(Path("artifacts") / "raptor_lite", task, registry.as_json(), report, result, trace, backend)
     print(f"Task: {task.name}")
     print(f"Verification result: {'approved' if report.approved else 'rejected'}")
-    print(f"Execution result: {'success' if result and result.success else 'not executed'}")
+    status = "success" if result and result.success else "failed" if result else "not executed"
+    print(f"Execution result: {status}")
+    if backend is not None: print(f"Scenario seed: {backend.seed}")
     print(f"Artifact directory: {output}")
     return 0 if result and result.success else 2
 
