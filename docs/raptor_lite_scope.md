@@ -11,3 +11,7 @@ Phase 1 scope: capability registry, task schema, verifier, mock executor, execut
 Non-goals: a complete RaPToR platform; unrestricted code generation; runtime LLM control; Nav2/SLAM research; multi-robot support; automatic ROS installation; visual programming; and physical robot validation.
 
 Provisional research questions: RQ1 verifier effectiveness; RQ2 natural-language plan reliability; RQ3 randomized House-Sitter case-study reliability.
+
+## Restart audit note
+
+Phase 1 is the authoritative small core checkpoint for the restart. It requires the declared pure-Python dependencies in `requirements-raptor-lite.txt`; this repository does not claim automatic dependency installation. Any future natural-language adapter produces a structured task candidate only and the verifier remains the execution gate. Current task/execution artifacts are simulation-only and are not physical-robot validation.
