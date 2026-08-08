@@ -49,7 +49,7 @@ def write_run(root: Path, task: TaskSpec, capabilities: dict[str, Any], report: 
     return output
 
 
-def write_planning_run(root: Path, planning: PlanningResult, capabilities: dict[str, Any], report: VerificationReport | None = None, result: ExecutionResult | None = None, trace: list[ExecutionTrace] | None = None, backend: Any | None = None, *, scenario_input: str | None = None, scenario_plan: dict[str, Any] | None = None, scenario_report: dict[str, Any] | None = None, robot_feedback: dict[str, Any] | None = None, robot_feedback_markdown: str | None = None) -> Path:
+def write_planning_run(root: Path, planning: PlanningResult, capabilities: dict[str, Any], report: VerificationReport | None = None, result: ExecutionResult | None = None, trace: list[ExecutionTrace] | None = None, backend: Any | None = None, *, scenario_input: str | None = None, scenario_plan: dict[str, Any] | None = None, scenario_report: dict[str, Any] | None = None, robot_feedback: dict[str, Any] | None = None, robot_feedback_markdown: str | None = None, run_request: dict[str, Any] | None = None) -> Path:
     """Persist a planning decision; execution evidence is added only after approval."""
     candidate = planning.candidate_task
     report = report or VerificationReport(approved=False, safety_summary=["No candidate task was submitted to the verifier."])
@@ -72,6 +72,9 @@ def write_planning_run(root: Path, planning: PlanningResult, capabilities: dict[
     if scenario_report is not None: dump(output / "scenario_verification_report.json", scenario_report)
     if robot_feedback is not None: dump(output / "robot_feedback.json", robot_feedback)
     if robot_feedback_markdown is not None: (output / "robot_feedback.md").write_text(robot_feedback_markdown, encoding="utf-8")
+    if run_request is not None:
+        snapshot = {**run_request, "run_id": output.name}
+        dump(output / "run_request.json", snapshot)
     if candidate is not None:
         dump(output / "candidate_task.json", candidate.model_dump(mode="json"))
         from .planner import normalized_task
@@ -80,5 +83,6 @@ def write_planning_run(root: Path, planning: PlanningResult, capabilities: dict[
     summary_path = output / "demo_summary.json"
     summary = json.loads(summary_path.read_text(encoding="utf-8"))
     summary.update({"planner_name": "offline_house_sitter", "planner_version": "1.0", "deterministic": True, "original_text": planning.original_text, "planning_status": planning.status, "verification_approved": report.approved, "execution_attempted": result is not None, "execution_success": bool(result and result.success), "simulation_only": True, "physical_robot_validated": False})
+    if run_request is not None: summary.update({key: value for key, value in snapshot.items() if key != "scenario_applied"})
     dump(summary_path, summary)
     return output

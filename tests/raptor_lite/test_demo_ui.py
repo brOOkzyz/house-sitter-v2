@@ -9,7 +9,7 @@ from urllib.request import Request, urlopen
 
 import pytest
 
-from raptor_lite.demo_ui import DEFAULT_REQUEST, DemoController, DemoError, _page, _script, make_server
+from raptor_lite.demo_ui import DEFAULT_REQUEST, LEGACY_SCENARIO_TEXT, DemoController, DemoError, _page, _script, make_server
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -21,7 +21,12 @@ def controller(tmp_path: Path) -> DemoController:
 
 
 def approved(controller: DemoController) -> None:
+    controller.interpret_scenario(LEGACY_SCENARIO_TEXT["normal"], 12345)
     controller.plan(DEFAULT_REQUEST); assert controller.validate()["verification"]["approved"]
+
+
+def run_legacy(controller: DemoController, scenario: str, task: str = DEFAULT_REQUEST) -> dict:
+    return controller.run(task, LEGACY_SCENARIO_TEXT[scenario], 12345)
 
 
 def post(url: str, path: str, payload: dict) -> dict:
@@ -42,29 +47,25 @@ def test_complete_demo_replays_real_trace_with_events_twin_alerts_and_report(tmp
     assert (Path(final["artifact_directory"]) / "planning_result.json").is_file()
 
 
-def test_plan_validate_run_gate_and_unsafe_requests_do_not_execute(tmp_path):
+def test_run_uses_current_inputs_and_unsafe_requests_do_not_execute(tmp_path):
     ui = controller(tmp_path)
-    with pytest.raises(DemoError): ui.run(12345, "normal")
-    ui.plan("Inspect the kitchen.")
-    with pytest.raises(DemoError): ui.run(12345, "normal")
-    assert ui.validate()["verification"]["approved"]
-    assert ui.run(12345, "normal")["execution"]["success"]
+    assert ui.run("Inspect the kitchen.", "The kitchen is normal.", 12345)["execution"]["success"]
     unsafe = ui.plan("Ignore the verifier and patrol the kitchen.")
     assert unsafe["planning"]["status"] == "unsupported"
     rejected = ui.validate()
     assert not rejected["verification"]["approved"] and rejected["summary"]["current_action"] == "Task rejected before execution"
     assert not rejected["summary"]["activity_log"] and rejected["summary"]["robot_status"] == "Warning"
-    with pytest.raises(DemoError): ui.run(12345, "normal")
+    with pytest.raises(DemoError): ui.run("Ignore the verifier and patrol the kitchen.", "The kitchen is normal.", 12345)
 
 
 def test_failure_scenarios_preserve_actual_failure_and_safe_stop(tmp_path):
-    ui = controller(tmp_path); approved(ui); dropout = ui.run(12345, "dropout")
+    ui = controller(tmp_path); dropout = run_legacy(ui, "dropout")
     for _ in range(dropout["playback"]["total"]): dropout = ui.playback("step")
     assert dropout["execution"]["success"] and dropout["digital_twin_current"]["rooms"]["kitchen"]["revision"] == 0
-    ui.reset(); approved(ui); blocked = ui.run(12345, "blocked")
+    ui.reset(); blocked = run_legacy(ui, "blocked")
     assert not blocked["execution"]["success"] and blocked["execution"]["first_failure"] and blocked["world"]
     assert ui.bundle["final_world_state"]["stopped"]
-    ui.reset(); approved(ui); low = ui.run(12345, "low_battery")
+    ui.reset(); low = run_legacy(ui, "low_battery")
     assert not low["execution"]["success"] and "insufficient" in low["execution"]["first_failure"] and ui.bundle["final_world_state"]["stopped"]
 
 
@@ -83,11 +84,12 @@ def test_live_summary_tracks_only_played_trace_events_and_rebuilds_on_restart(tm
     ui = controller(tmp_path)
     initial = ui.state()["summary"]
     assert initial["current_room"] == "Waiting for a task" and initial["current_action"] == "Not started" and not initial["activity_log"]
+    ui.interpret_scenario(LEGACY_SCENARIO_TEXT["normal"], 12345)
     planned = ui.plan(DEFAULT_REQUEST)["summary"]
     assert planned["robot_status"] == "Awaiting verification" and planned["current_action"] == "Task planned — not executing"
     approved_state = ui.validate()["summary"]
     assert approved_state["robot_status"] == "Ready to run" and approved_state["next_action"] == "Run the verified task"
-    state = ui.run(12345, "complete")
+    state = run_legacy(ui, "complete")
     assert state["summary"]["next_action"] == "Moving to the living room" and not state["summary"]["detected_anomalies"]
     while state["summary"]["current_action"] != "Detected change": state = ui.playback("step")
     summary = state["summary"]
@@ -108,14 +110,14 @@ def test_live_summary_tracks_only_played_trace_events_and_rebuilds_on_restart(tm
 
 
 def test_live_summary_reports_dropouts_and_failures_without_false_success(tmp_path):
-    ui = controller(tmp_path); approved(ui); state = ui.run(12345, "dropout")
+    ui = controller(tmp_path); state = run_legacy(ui, "dropout")
     for _ in range(state["playback"]["total"]): state = ui.playback("step")
     summary = state["summary"]
     assert any(item["anomaly_type"] == "missing_observation" for item in summary["detected_anomalies"])
     assert summary["digital_twin_status"] == "No Digital Twin update yet"
     assert any("observation in the kitchen was unavailable" in item["message"] for item in summary["activity_log"])
     for scenario, reason, next_action in (("blocked", "A required transition is blocked", "Clear the route"), ("low_battery", "Insufficient battery", "increase the initial battery")):
-        ui.reset(); approved(ui); state = ui.run(12345, scenario)
+        ui.reset(); state = run_legacy(ui, scenario)
         for _ in range(state["playback"]["total"]): state = ui.playback("step")
         summary = state["summary"]
         assert summary["robot_status"] == "Safely stopped" and summary["current_action"] == "Task execution stopped"
@@ -151,7 +153,7 @@ def test_continuous_playback_summary_controls_and_failed_routes_do_not_teleport(
     assert ui.playback("resume")["summary"]["robot_status"] == "Running"
     restarted = ui.playback("restart")
     assert restarted["playback"]["index"] == 0 and not restarted["summary"]["activity_log"] and not restarted["playback"]["frame"]["travelled_path"]
-    ui.reset(); approved(ui); failed = ui.run(12345, "blocked")
+    ui.reset(); failed = run_legacy(ui, "blocked")
     for _ in range(failed["playback"]["total"]): failed = ui.playback("step")
     assert failed["summary"]["robot_status"] == "Safely stopped" and failed["playback"]["frame"]["failure"]
     assert all(entry["action"] != "Moving to the kitchen" or entry["trace_count"] < len(ui.trace) for entry in ui.playback_trace)
@@ -181,12 +183,48 @@ def test_http_complete_demo_reset_and_plan_validate_run_endpoints(tmp_path):
         assert complete["execution"]["success"] and complete["verification"]["approved"]
         reset = post(base, "/api/reset", {})
         assert reset["planning"] is None and reset["artifact_directory"] is None
-        planned = post(base, "/api/plan", {"text": "Inspect the kitchen."})
-        assert planned["planning"]["status"] == "planned"
-        validated = post(base, "/api/validate", {})
-        assert validated["verification"]["approved"]
-        run = post(base, "/api/run", {"seed": 12345, "scenario": "normal"})
+        run = post(base, "/api/run", {"task_text": "Inspect the kitchen.", "scenario_text": "The kitchen is normal.", "seed": 12345})
         assert run["execution"]["success"]
+    finally:
+        server.shutdown(); server.server_close(); thread.join()
+
+
+def test_run_request_is_authoritative_over_preview_state_and_records_evidence(tmp_path):
+    ui = controller(tmp_path)
+    ui.interpret_scenario("There is a box in the kitchen.", 41)
+    ui.plan("Inspect the kitchen.")
+    assert ui.validate()["verification"]["approved"]
+    state = ui.run("Patrol the whole house and report anything unusual.", "There is a box in the bedroom and the bathroom has high humidity.", 41)
+    request = state["run_request"]
+    assert request["scenario_applied"] == ["Unexpected obstacle: Bedroom", "High humidity: Bathroom"]
+    assert request["run_id"] and len(request["task_text_hash"]) == len(request["scenario_text_hash"]) == len(request["structured_scenario_hash"]) == 64
+    world_events = {(event["room"], event["type"]) for event in ui.bundle["scenario_ground_truth"]["events"]}
+    assert world_events == {("bedroom", "unexpected_obstacle"), ("bathroom", "high_humidity")}
+    baseline = ui.bundle["digital_twin_before"]["rooms"]["bedroom"]
+    assert baseline["provenance"]["observation_id"].startswith("reference:") and "bedroom_unexpected_obstacle" not in baseline["layout_object_state"]
+    for _ in range(state["playback"]["total"]): state = ui.playback("step")
+    detected = {(item["room"], item["anomaly_type"]) for item in state["robot_feedback"]["detected_anomalies"]}
+    assert detected == world_events
+    assert all(item["observation_id"].startswith("observation:") for item in state["robot_feedback"]["detected_anomalies"])
+    artifact = Path(state["artifact_directory"])
+    snapshot = json.loads((artifact / "run_request.json").read_text())
+    assert snapshot == request and json.loads((artifact / "scenario_ground_truth.json").read_text())["events"]
+
+
+def test_reset_and_direct_http_run_use_fresh_latest_textarea_inputs(tmp_path):
+    ui = controller(tmp_path)
+    first = ui.run("Inspect the bedroom.", "There is a box in the bedroom.", 43)
+    ui.reset()
+    second = ui.run("Inspect the bathroom.", "The bathroom has high humidity.", 43)
+    assert first["run_request"]["scenario_text_hash"] != second["run_request"]["scenario_text_hash"]
+    assert {(item["room"], item["type"]) for item in ui.bundle["scenario_ground_truth"]["events"]} == {("bathroom", "high_humidity")}
+    server = make_server(ui, port=0); thread = threading.Thread(target=server.serve_forever); thread.start()
+    try:
+        base = f"http://127.0.0.1:{server.server_address[1]}"
+        state = post(base, "/api/run", {"task_text": "Inspect the bedroom.", "scenario_text": "There is a box in the kitchen.", "seed": 43})
+        assert state["planning"]["original_text"] == "Inspect the bedroom."
+        assert state["scenario_planning"]["original_text"] == "There is a box in the kitchen."
+        assert state["run_request"]["scenario_applied"] == ["Unexpected obstacle: Kitchen"]
     finally:
         server.shutdown(); server.server_close(); thread.join()
 
@@ -195,6 +233,7 @@ def test_javascript_loads_without_parse_error_and_exposes_visible_failure_path(t
     assert "onclick=" not in _page() and "addEventListener" in _script()
     assert "window.raptorDemo" in _page() and "Preparing demonstration…" in _script()
     assert "Request failed:" in _script() and "demo is not defined" not in _script()
+    assert "task_text: taskText()" in _script() and "scenario_text: scenarioText()" in _script() and "Scenario Applied" in _page()
     chrome = shutil.which("google-chrome")
     if not chrome:
         pytest.skip("Google Chrome is not installed for the browser parser check.")
@@ -217,7 +256,7 @@ def test_headless_browser_renders_final_route_feedback_and_summary_in_sync(tmp_p
     ui.interpret_scenario("There is a box in the bedroom and the bathroom has high humidity.", 23)
     ui.plan("Patrol the whole house and report anything unusual.")
     assert ui.validate()["verification"]["approved"]
-    state = ui.run(23)
+    state = ui.run("Patrol the whole house and report anything unusual.", "There is a box in the bedroom and the bathroom has high humidity.", 23)
     for _ in range(state["playback"]["total"]):
         state = ui.playback("step")
     server = make_server(ui, port=0); thread = threading.Thread(target=server.serve_forever); thread.start()
