@@ -49,7 +49,7 @@ def write_run(root: Path, task: TaskSpec, capabilities: dict[str, Any], report: 
     return output
 
 
-def write_planning_run(root: Path, planning: PlanningResult, capabilities: dict[str, Any], report: VerificationReport | None = None, result: ExecutionResult | None = None, trace: list[ExecutionTrace] | None = None, backend: Any | None = None, *, scenario_input: str | None = None, scenario_plan: dict[str, Any] | None = None, scenario_report: dict[str, Any] | None = None, robot_feedback: dict[str, Any] | None = None, robot_feedback_markdown: str | None = None, run_request: dict[str, Any] | None = None) -> Path:
+def write_planning_run(root: Path, planning: PlanningResult, capabilities: dict[str, Any], report: VerificationReport | None = None, result: ExecutionResult | None = None, trace: list[ExecutionTrace] | None = None, backend: Any | None = None, *, scenario_input: str | None = None, scenario_plan: dict[str, Any] | None = None, scenario_report: dict[str, Any] | None = None, robot_feedback: dict[str, Any] | None = None, robot_feedback_markdown: str | None = None, run_request: dict[str, Any] | None = None, confirmation_preview: dict[str, Any] | None = None) -> Path:
     """Persist a planning decision; execution evidence is added only after approval."""
     candidate = planning.candidate_task
     report = report or VerificationReport(approved=False, safety_summary=["No candidate task was submitted to the verifier."])
@@ -75,6 +75,7 @@ def write_planning_run(root: Path, planning: PlanningResult, capabilities: dict[
     if run_request is not None:
         snapshot = {**run_request, "run_id": output.name}
         dump(output / "run_request.json", snapshot)
+    if confirmation_preview is not None: dump(output / "confirmation_preview.json", confirmation_preview)
     if candidate is not None:
         dump(output / "candidate_task.json", candidate.model_dump(mode="json"))
         from .planner import normalized_task

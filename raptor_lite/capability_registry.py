@@ -23,3 +23,18 @@ class CapabilityRegistry:
 
     def as_json(self) -> dict[str, object]:
         return {"capabilities": [item.model_dump(mode="json") for item in self.capabilities.values()], "available_capabilities": sorted(self.available_capabilities)}
+
+    def explore(self, query: str = "") -> dict[str, object]:
+        """Describe this profile from its declared capabilities, never UI constants."""
+        terms = {word for word in query.casefold().replace("_", " ").split() if word}
+        entries = []
+        for capability in self.capabilities.values():
+            text = " ".join((capability.name, capability.description, *capability.safety_constraints)).replace("_", " ").casefold()
+            if terms and not terms <= set(text.split()) and not terms & set(text.split()):
+                continue
+            entries.append({"name": capability.name, "description": capability.description, "parameters": [item.model_dump(mode="json") for item in capability.parameters], "required_capabilities": capability.required_capabilities, "safety_constraints": capability.safety_constraints, "simulation_supported": capability.simulation_supported, "physical_robot_supported": capability.physical_robot_supported, "execution_adapter": capability.execution_adapter})
+        limitations = sorted({constraint for item in self.capabilities.values() for constraint in item.safety_constraints})
+        natural = [f"Can {item['name'].replace('_', ' ')}: {item['description']}" for item in entries]
+        if any(not item.physical_robot_supported for item in self.capabilities.values()):
+            natural.append("Cannot control a physical robot: this profile is simulation-only.")
+        return {"query": query, "available_capabilities": sorted(self.available_capabilities), "capabilities": entries, "limitations": limitations, "natural_language": natural}

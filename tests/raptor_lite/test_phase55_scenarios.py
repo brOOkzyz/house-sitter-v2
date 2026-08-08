@@ -24,6 +24,7 @@ def run(controller: DemoController, task: str, scenario: str, seed: int = 12345)
     controller.interpret_scenario(scenario, seed)
     controller.plan(task)
     assert controller.validate()["verification"]["approved"]
+    controller.confirm(task, scenario, seed)
     state = controller.run(task, scenario, seed)
     for _ in range(state["playback"]["total"]): state = controller.playback("step")
     return state
@@ -83,7 +84,7 @@ def test_artifacts_seed_reset_and_run_gate(tmp_path):
     controller.interpret_scenario("There is a box in the bedroom.", 3)
     controller.plan("Inspect the bedroom.")
     with pytest.raises(DemoError): controller.run("Inspect the bedroom.", "unsupported scenario", 3)
-    controller.validate(); first = controller.run("Inspect the bedroom.", "There is a box in the bedroom.", 3)
+    controller.validate(); controller.confirm("Inspect the bedroom.", "There is a box in the bedroom.", 3); first = controller.run("Inspect the bedroom.", "There is a box in the bedroom.", 3)
     for _ in range(first["playback"]["total"]): first = controller.playback("step")
     artifact = Path(first["artifact_directory"])
     for name in ("natural_language_scenario_input.json", "scenario_planning_result.json", "candidate_scenario.json", "scenario_verification_report.json", "scenario_ground_truth.json", "visual_event_manifest.json", "robot_feedback.json", "robot_feedback.md"):
@@ -99,6 +100,7 @@ def test_normal_reference_detects_current_scenarios_only_after_their_room_is_vis
     controller.interpret_scenario("There is a box in the bedroom and the bathroom has high humidity.", 7)
     controller.plan("Patrol the whole house and report anything unusual.")
     assert controller.validate()["verification"]["approved"]
+    controller.confirm("Patrol the whole house and report anything unusual.", "There is a box in the bedroom and the bathroom has high humidity.", 7)
     state = controller.run("Patrol the whole house and report anything unusual.", "There is a box in the bedroom and the bathroom has high humidity.", 7)
     assert state["playback"]["frame"]["events"] and not state["playback"]["frame"]["anomalies"]
     while not state["playback"]["frame"]["anomalies"]:
@@ -123,6 +125,7 @@ def test_reference_baseline_does_not_absorb_abnormality_and_explicit_baseline_is
     controller.interpret_scenario("There is a box in the bedroom.", 11)
     controller.plan("Establish a household baseline in the bedroom.")
     assert controller.validate()["verification"]["approved"]
+    controller.confirm("Establish a household baseline in the bedroom.", "There is a box in the bedroom.", 11)
     state = controller.run("Establish a household baseline in the bedroom.", "There is a box in the bedroom.", 11)
     assert not state["robot_feedback"]["detected_anomalies"]
     baseline = next(item for item in controller.bundle["baseline_observations"] if item["room"] == "bedroom")

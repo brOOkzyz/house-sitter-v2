@@ -17,6 +17,7 @@ from .capability_registry import CapabilityRegistry
 from .executor import BackendExecutor, MockExecutor
 from .house2d import DOORS, HOUSE_LAYOUT, ROOMS, House2DBackend, layout_location, layout_route
 from .models import PlanningResult, VerificationReport
+from .phase56 import confirmation_preview, safe_repair
 from .planner import OfflineHouseSitterPlanner
 from .robot_feedback import build_feedback, feedback_markdown
 from .scenario import plan_scenario, verify_scenario
@@ -81,6 +82,9 @@ class DemoController:
             self.scenario_report: dict[str, Any] | None = None
             self.scenario_input: str | None = None
             self.run_request: dict[str, Any] | None = None
+            self.confirmation: dict[str, Any] | None = None
+            self.repair_result: dict[str, Any] | None = None
+            self.capability_explorer = self.registry.explore()
             self.report: VerificationReport | None = None
             self.result = None
             self.trace: list[Any] = []
@@ -100,6 +104,7 @@ class DemoController:
             self._begin()
             try:
                 self.planning = self.planner.plan(self._text(text))
+                self.confirmation = None; self.repair_result = None
                 self.report = None; self.result = None; self.trace = []; self.playback_trace = []; self.bundle = {}; self.artifact_dir = None
                 self.index = 0; self.paused = True; self.started = False; self.explicitly_paused = False; self.phase = "planned"
                 return self.state()
@@ -112,6 +117,7 @@ class DemoController:
             try:
                 scenario_text, parsed_seed = self._text(text), self._seed(seed)
                 self.scenario_input = scenario_text
+                self.confirmation = None; self.repair_result = None
                 self.scenario_planning = plan_scenario(scenario_text, parsed_seed)
                 self.scenario_report = verify_scenario(self.scenario_planning)
                 self.result = None; self.trace = []; self.playback_trace = []; self.bundle = {}; self.artifact_dir = None
@@ -120,6 +126,43 @@ class DemoController:
                 return self.state()
             finally:
                 self._end()
+
+    @staticmethod
+    def _confirmation_json(preview: dict[str, Any]) -> dict[str, Any]:
+        return {"approved": preview["approved"], "snapshot": preview["snapshot"], "planning": preview["planning"].model_dump(mode="json"), "scenario": preview["scenario"], "scenario_verification": preview["scenario_verification"], "verification": preview["verification"].model_dump(mode="json"), "verification_explanation": preview["verification_explanation"], "route": preview["route"], "safety_constraints": preview["safety_constraints"]}
+
+    def _confirm_request(self, task_text: str, scenario_text: str, seed: int) -> dict[str, Any]:
+        preview = confirmation_preview(task_text, scenario_text, seed, self.planner, self.registry)
+        self.repair_result = None
+        self.confirmation = self._confirmation_json(preview)
+        self.planning, self.scenario_input = preview["planning"], scenario_text
+        self.scenario_planning, self.scenario_report, self.report = preview["scenario"], preview["scenario_verification"], preview["verification"]
+        self.phase = "confirmed" if preview["approved"] else "rejected"
+        return preview
+
+    def confirm(self, task_text: Any, scenario_text: Any, seed: Any) -> dict[str, Any]:
+        with self._lock:
+            self._begin()
+            try:
+                self._confirm_request(self._text(task_text), self._text(scenario_text), self._seed(seed))
+                return self.state()
+            finally:
+                self._end()
+
+    def explore_capabilities(self, query: Any = "") -> dict[str, Any]:
+        if not isinstance(query, str) or len(query) > 256:
+            raise DemoError("Capability query must be text no longer than 256 characters.")
+        with self._lock:
+            self.capability_explorer = self.registry.explore(query)
+            return self.state()
+
+    def repair(self, task: Any) -> dict[str, Any]:
+        with self._lock:
+            try:
+                self.repair_result = safe_repair(task, self.registry)
+                return self.state()
+            except Exception as exc:
+                raise DemoError(f"Safe repair requires a valid TaskSpec: {exc}") from exc
 
     def validate(self) -> dict[str, Any]:
         with self._lock:
@@ -136,26 +179,22 @@ class DemoController:
         """Atomically derive execution from the current browser inputs, never previews."""
         self.result = None; self.trace = []; self.playback_trace = []; self.bundle = {}; self.artifact_dir = None; self.run_request = None
         self.index = 0; self.paused = True; self.started = False; self.explicitly_paused = False
-        self.planning = self.planner.plan(task_text)
-        self.scenario_input = scenario_text
-        self.scenario_planning = plan_scenario(scenario_text, seed)
-        self.scenario_report = verify_scenario(self.scenario_planning)
-        self.report = verify_task(self.planning.candidate_task, self.registry) if self.planning.status == "planned" and self.planning.candidate_task else VerificationReport(approved=False, safety_summary=["No planned candidate task is available for validation."])
-        if not self.scenario_report["approved"]:
-            self.report = VerificationReport(approved=False, safety_summary=["Scenario verification must approve the structured scenario before execution."])
-            self.phase = "scenario_rejected"
-            raise DemoError("Scenario verification did not approve the current Scenario input; patrol was not started.")
-        if not self.report.approved or self.planning.candidate_task is None:
+        fresh = confirmation_preview(task_text, scenario_text, seed, self.planner, self.registry)
+        if self.confirmation is None or fresh["snapshot"] != self.confirmation["snapshot"]:
+            raise DemoError("Confirmation is missing or inputs changed; review the current confirmation preview before patrol.")
+        self.planning, self.scenario_input = fresh["planning"], scenario_text
+        self.scenario_planning, self.scenario_report, self.report = fresh["scenario"], fresh["scenario_verification"], fresh["verification"]
+        if not fresh["approved"] or self.planning.candidate_task is None:
             self.phase = "rejected"
-            raise DemoError("The current Task input was not verifier-approved; patrol was not started.")
-        self.run_request = {"task_text_hash": self._hash(task_text), "scenario_text_hash": self._hash(scenario_text), "structured_scenario_hash": self._hash(self.scenario_planning["candidate_scenario"]), "seed": seed, "run_id": None, "scenario_applied": self._scenario_applied(self.scenario_planning)}
+            raise DemoError("The confirmed TaskSpec or ScenarioSpec was not verifier-approved; patrol was not started.")
+        self.run_request = {**fresh["snapshot"], "run_id": None, "scenario_applied": self._scenario_applied(self.scenario_planning)}
         backend = House2DBackend(seed=seed, scenario={**self.scenario_planning["candidate_scenario"], "validation_status": "approved"})
         self.result, self.trace = BackendExecutor(backend).run(self.planning.candidate_task, self.report, self.registry)
         self.bundle = backend.artifact_bundle()
         feedback = build_feedback(self.planning.candidate_task.metadata.get("optimized_visit_order", self.planning.extracted_rooms), self.trace, self.bundle, execution_success=self.result.success)
         self.bundle["robot_feedback"] = feedback
         self.playback_trace = self._expand_playback_trace()
-        self.artifact_dir = write_planning_run(self.artifact_root, self.planning, self.registry.as_json(), self.report, self.result, self.trace, backend, scenario_input=self.scenario_input, scenario_plan=self.scenario_planning, scenario_report=self.scenario_report, robot_feedback=feedback, robot_feedback_markdown=feedback_markdown(feedback), run_request=self.run_request)
+        self.artifact_dir = write_planning_run(self.artifact_root, self.planning, self.registry.as_json(), self.report, self.result, self.trace, backend, scenario_input=self.scenario_input, scenario_plan=self.scenario_planning, scenario_report=self.scenario_report, robot_feedback=feedback, robot_feedback_markdown=feedback_markdown(feedback), run_request=self.run_request, confirmation_preview=self.confirmation)
         self.run_request["run_id"] = self.artifact_dir.name
         self.index = 0; self.paused = True; self.started = False; self.explicitly_paused = False; self.phase = "playback" if self.result.success else "failed"
         return self.state()
@@ -172,6 +211,7 @@ class DemoController:
         with self._lock:
             self._begin()
             try:
+                self._confirm_request(DEFAULT_REQUEST, LEGACY_SCENARIO_TEXT["complete"], self._seed(seed))
                 return self._run_request(DEFAULT_REQUEST, LEGACY_SCENARIO_TEXT["complete"], self._seed(seed))
             finally:
                 self._end()
@@ -387,7 +427,7 @@ class DemoController:
             world = {**self.bundle.get("simulator_config", {"rooms": ROOMS, "doors": [list(item) for item in DOORS]}), "layout": HOUSE_LAYOUT}
             feedback = build_feedback(self.planning.candidate_task.metadata.get("optimized_visit_order", self.planning.extracted_rooms) if self.planning and self.planning.candidate_task else [], self.trace, self.bundle, trace_count=frame["trace_count"], execution_success=None) if self.bundle else None
             if self.index == len(self.playback_trace) and self.bundle: feedback = self.bundle.get("robot_feedback")
-            return {"phase": self.phase, "busy": self._busy, "planning": self.planning.model_dump(mode="json") if self.planning else None, "scenario_planning": self.scenario_planning, "scenario_verification": self.scenario_report, "verification": self.report.model_dump(mode="json") if self.report else None, "execution": self.result.model_dump(mode="json") if self.result else None, "run_request": deepcopy(self.run_request), "robot_feedback": feedback, "playback": {"index": self.index, "total": len(self.playback_trace), "paused": self.paused, "speed": self.speed, "frame": frame}, "summary": self._summary(frame), "world": world, "digital_twin_before": self.bundle.get("digital_twin_before"), "digital_twin_current": self._visible_twin(frame), "artifact_directory": str(self.artifact_dir) if self.artifact_dir else None, "artifact_files": self._artifact_files(), "simulation_only": True, "physical_robot_validated": False}
+            return {"phase": self.phase, "busy": self._busy, "planning": self.planning.model_dump(mode="json") if self.planning else None, "scenario_planning": self.scenario_planning, "scenario_verification": self.scenario_report, "verification": self.report.model_dump(mode="json") if self.report else None, "verification_explanation": self.confirmation.get("verification_explanation") if self.confirmation else None, "confirmation": deepcopy(self.confirmation), "capability_explorer": deepcopy(self.capability_explorer), "safe_repair": deepcopy(self.repair_result), "execution": self.result.model_dump(mode="json") if self.result else None, "run_request": deepcopy(self.run_request), "robot_feedback": feedback, "playback": {"index": self.index, "total": len(self.playback_trace), "paused": self.paused, "speed": self.speed, "frame": frame}, "summary": self._summary(frame), "world": world, "digital_twin_before": self.bundle.get("digital_twin_before"), "digital_twin_current": self._visible_twin(frame), "artifact_directory": str(self.artifact_dir) if self.artifact_dir else None, "artifact_files": self._artifact_files(), "simulation_only": True, "physical_robot_validated": False}
 
     def artifact(self, name: str) -> dict[str, Any]:
         with self._lock:
@@ -415,9 +455,10 @@ body{font:14px system-ui,sans-serif;margin:0;background:#f4f6f8;color:#17212b}he
 <body><header><b>RaPToR-Lite House-Sitter Demo</b><span class="boundary"> simulation-only — physical robot validation not performed</span></header>
 <div id="app-status" data-state="loading" role="status">Loading interface…</div>
 <main>
-<section><h2>Task Creation</h2><label>Robot Task</label><textarea id="task-text">Patrol the bedroom and tell me whether anything is wrong.</textarea><label>Household Scenario</label><textarea id="scenario-text">The bedroom is normal.</textarea><label>Seed <input id="seed" type="number" value="12345" min="0" max="2147483647"></label><div class="row"><button id="interpret-button">Interpret Scenario</button><button id="plan-button">Plan Task</button><button id="validate-button">Validate</button><button id="run-button">Run</button><button id="reset-button">Reset</button></div><small>Run always validates the current text fields; scenario preview is optional.</small><details><summary>Technical planning evidence</summary><h3>Task Planning Result</h3><pre id="planning"></pre><h3>Scenario Planning Result</h3><pre id="scenario-planning"></pre><h3>Task Verification</h3><pre id="verify"></pre><h3>Scenario Verification</h3><pre id="scenario-verify"></pre></details></section>
+<section><h2>Task Creation</h2><label>Robot Task</label><textarea id="task-text">Patrol the bedroom and tell me whether anything is wrong.</textarea><label>Household Scenario</label><textarea id="scenario-text">The bedroom is normal.</textarea><label>Seed <input id="seed" type="number" value="12345" min="0" max="2147483647"></label><div class="row"><button id="interpret-button">Interpret Scenario</button><button id="plan-button">Plan Task</button><button id="validate-button">Validate</button><button id="confirm-button">Confirm Preview</button><button id="run-button" disabled>Run</button><button id="reset-button">Reset</button></div><small>Run requires a matching verifier-approved confirmation of the current text fields.</small><details><summary>Technical planning evidence</summary><h3>Task Planning Result</h3><pre id="planning"></pre><h3>Scenario Planning Result</h3><pre id="scenario-planning"></pre><h3>Task Verification</h3><pre id="verify"></pre><h3>Scenario Verification</h3><pre id="scenario-verify"></pre></details></section>
 <section><h2>Household Simulation</h2><svg id="map" viewBox="0 0 720 520" width="100%" aria-label="House2D replay"></svg><div class="legend"><span class="planned-key">planned route</span><span class="travelled-key">travelled route</span><span class="event-key">physical event / confirmed change</span></div><div class="row"><button id="pause-button">Pause</button><button id="resume-button">Resume</button><button id="step-button">Step</button><button id="restart-button">Restart</button><button id="faster-button">Run faster</button></div><pre id="status"></pre><h3>Sensor Observations</h3><pre id="observations"></pre></section>
-<section><h2>Robot Feedback</h2><pre id="feedback"></pre><h3>Scenario Applied</h3><pre id="scenario-applied">No scenario has been applied.</pre><h3>Detected Anomalies / Alerts</h3><pre id="alerts"></pre><h3>Digital Twin Diff</h3><pre id="twin"></pre><h3>Monitoring Report</h3><pre id="report"></pre><article class="summary" aria-labelledby="summary-heading"><h3 id="summary-heading">Live Demo Summary</h3><dl id="summary-fields" class="summary-grid"></dl><h4>Activity Log</h4><ol id="activity-log" class="activity-log" aria-live="polite"></ol></article><details><summary>Technical evidence</summary><h3>Candidate Task</h3><pre id="task"></pre><h3>Capability Match</h3><pre id="caps"></pre><h3>Artifacts</h3><div id="files"></div><pre id="file"></pre></details></section>
+<section><h2>Robot Feedback</h2><pre id="feedback"></pre><h3>Confirmation Preview</h3><pre id="confirmation">No confirmation preview.</pre><h3>Scenario Applied</h3><pre id="scenario-applied">No scenario has been applied.</pre><h3>Detected Anomalies / Alerts</h3><pre id="alerts"></pre><h3>Digital Twin Diff</h3><pre id="twin"></pre><h3>Monitoring Report</h3><pre id="report"></pre><article class="summary" aria-labelledby="summary-heading"><h3 id="summary-heading">Live Demo Summary</h3><dl id="summary-fields" class="summary-grid"></dl><h4>Activity Log</h4><ol id="activity-log" class="activity-log" aria-live="polite"></ol></article><details><summary>Technical evidence</summary><h3>Candidate Task</h3><pre id="task"></pre><h3>Capability Match</h3><pre id="caps"></pre><h3>Verifier Explanation</h3><pre id="verification-explanation"></pre><button id="repair-button">Propose Safe Repair</button><pre id="safe-repair"></pre><h3>Artifacts</h3><div id="files"></div><pre id="file"></pre></details></section>
+<section><h2>Capability Explorer</h2><label>Capability query <input id="capability-query" placeholder="e.g. inspect or physical"></label><button id="capability-button">Explore capabilities</button><pre id="capabilities"></pre></section>
 </main>
 <script>window.raptorDemo={initialized:false,lastError:null};window.addEventListener("error",function(event){var status=document.getElementById("app-status");window.raptorDemo.lastError=event.message;status.textContent="JavaScript error: "+event.message;status.dataset.state="error";});</script>
 <script src="/app.js"></script></body></html>"""
@@ -462,7 +503,10 @@ def _script() -> str:
   const interpret = () => perform("Interpreting scenario…", "/api/interpret-scenario", {text: scenarioText(), seed: seed()}, "Scenario interpretation is ready.");
   const plan = () => perform("Planning task…", "/api/plan", {text: taskText()}, "Task plan is ready.");
   const validate = () => perform("Validating candidate task…", "/api/validate", {}, "Verification is complete.");
-  const run = () => perform("Executing current task and scenario…", "/api/run", {task_text: taskText(), scenario_text: scenarioText(), seed: seed()}, "Execution trace is ready.");
+  const confirm = () => perform("Building confirmation preview…", "/api/confirmation", {task_text: taskText(), scenario_text: scenarioText(), seed: seed()}, "Confirmation preview is ready.");
+  const run = () => perform("Executing confirmed task and scenario…", "/api/run", {task_text: taskText(), scenario_text: scenarioText(), seed: seed()}, "Execution trace is ready.");
+  const capabilities = () => perform("Exploring declared capabilities…", "/api/capabilities", {query: byId("capability-query").value}, "Capability explorer updated.");
+  const repair = () => state.planning?.candidate_task ? perform("Proposing safe repair…", "/api/repair", {task: state.planning.candidate_task}, "Safe repair was re-verified.") : setStatus("Plan or confirm a TaskSpec before proposing a repair.", "error");
   // Preparing demonstration… remains available through the localhost API for legacy automation.
   const reset = () => perform("Resetting demonstration…", "/api/reset", {}, "Demonstration has been reset.");
   const playback = (action) => perform("Updating replay…", "/api/playback", {action}, "Replay updated.");
@@ -524,6 +568,9 @@ def _script() -> str:
     show("scenario-planning", snapshot.scenario_planning || {message: "Interpret a household scenario first."});
     show("scenario-verify", snapshot.scenario_verification || {message: "No scenario verification yet."});
     show("verify", snapshot.verification || {message: "Plan before validation"});
+    show("verification-explanation", snapshot.verification_explanation || {message: "No verification explanation yet."});
+    show("safe-repair", snapshot.safe_repair || {message: "No safe repair proposal yet."});
+    show("capabilities", snapshot.capability_explorer || {});
     show("task", planning.candidate_task || {});
     show("caps", {resolved_capabilities: snapshot.verification?.resolved_capabilities, safety_summary: snapshot.verification?.safety_summary});
     renderSummary(snapshot.summary);
@@ -534,9 +581,10 @@ def _script() -> str:
     show("alerts", {anomalies: frame.anomalies || [], alerts: frame.alerts || []});
     show("twin", {baseline: snapshot.digital_twin_before, current: snapshot.digital_twin_current, updates: frame.twin_updates || []});
     byId("feedback").textContent = snapshot.robot_feedback?.final_message || "Robot feedback will be based on completed observations.";
+    show("confirmation", snapshot.confirmation || {message: "Confirm current inputs before Run."});
     byId("scenario-applied").textContent = snapshot.run_request ? "Scenario applied:\n- " + snapshot.run_request.scenario_applied.join("\n- ") : "No scenario has been applied.";
     byId("report").textContent = frame.report || "";
-    byId("run-button").disabled = false;
+    byId("run-button").disabled = !(snapshot.confirmation && snapshot.confirmation.approved);
     const files = byId("files");
     files.replaceChildren();
     (snapshot.artifact_files || []).forEach((name) => {
@@ -553,7 +601,11 @@ def _script() -> str:
   byId("interpret-button").addEventListener("click", interpret);
   byId("plan-button").addEventListener("click", plan);
   byId("validate-button").addEventListener("click", validate);
+  byId("confirm-button").addEventListener("click", confirm);
   byId("run-button").addEventListener("click", run);
+  byId("capability-button").addEventListener("click", capabilities);
+  byId("repair-button").addEventListener("click", repair);
+  [byId("task-text"), byId("scenario-text"), byId("seed")].forEach((input) => input.addEventListener("input", () => { byId("run-button").disabled = true; }));
   byId("reset-button").addEventListener("click", reset);
   byId("pause-button").addEventListener("click", () => playback("pause"));
   byId("resume-button").addEventListener("click", () => playback("resume"));
@@ -594,6 +646,7 @@ def make_server(controller: DemoController, host: str = "127.0.0.1", port: int =
                 elif parsed.path == "/favicon.ico": self._send(HTTPStatus.NO_CONTENT, "", "image/x-icon")
                 elif parsed.path == "/api/health": self._send(HTTPStatus.OK, {"ok": True, "localhost_only": True, "simulation_only": True})
                 elif parsed.path == "/api/state": self._send(HTTPStatus.OK, controller.state())
+                elif parsed.path == "/api/capabilities": self._send(HTTPStatus.OK, controller.explore_capabilities(parse_qs(parsed.query).get("query", [""])[0]))
                 elif parsed.path == "/api/artifact": self._send(HTTPStatus.OK, controller.artifact(parse_qs(parsed.query).get("name", [""])[0]))
                 else: self._send(HTTPStatus.NOT_FOUND, {"error": "Not found."})
             except DemoError as exc: self._send(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
@@ -605,7 +658,10 @@ def make_server(controller: DemoController, host: str = "127.0.0.1", port: int =
                 if action == "/api/plan": output = controller.plan(body.get("text"))
                 elif action == "/api/interpret-scenario": output = controller.interpret_scenario(body.get("text"), body.get("seed"))
                 elif action == "/api/validate": output = controller.validate()
+                elif action == "/api/confirmation": output = controller.confirm(body.get("task_text"), body.get("scenario_text"), body.get("seed"))
                 elif action == "/api/run": output = controller.run(body.get("task_text"), body.get("scenario_text"), body.get("seed"))
+                elif action == "/api/capabilities": output = controller.explore_capabilities(body.get("query", ""))
+                elif action == "/api/repair": output = controller.repair(body.get("task"))
                 elif action == "/api/demo": output = controller.complete_demo(body.get("seed", 12345))
                 elif action == "/api/reset": output = controller.reset()
                 elif action == "/api/playback": output = controller.playback(str(body.get("action", "")))
