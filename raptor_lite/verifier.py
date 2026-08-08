@@ -80,6 +80,28 @@ def verify_task(task: TaskSpec | dict[str, Any], registry: CapabilityRegistry) -
         issues.append(_issue(codes.MISSING_SAFE_RETURN, "A patrol task must include return_to_start.", "Add a bounded return_to_start step before stop.", field="steps"))
     if skills and skills[-1] not in {"stop", "return_to_start"} and not (skills[-1] == "generate_monitoring_report" and "stop" in skills[:-1]):
         issues.append(_issue(codes.MISSING_SAFE_RETURN, "The task must end with stop or return_to_start.", "Add stop or return_to_start as the final step.", field="steps"))
+    baseline_mode = parsed.metadata.get("baseline_mode")
+    if baseline_mode == "normal_reference":
+        observed: set[str] = set(); detected: set[str] = set(); updated: set[str] = set()
+        for step in parsed.steps:
+            room = step.parameters.get("room")
+            if step.skill in {"record_baseline", "establish_household_baseline"}:
+                issues.append(_issue(codes.BASELINE_REQUIRED, "A normal-reference patrol cannot overwrite its baseline.", "Use an explicit baseline task to record current observations.", step_id=step.step_id, field="skill"))
+            elif step.skill == "inspect_room" and isinstance(room, str):
+                observed.add(room)
+            elif step.skill == "detect_environment_change" and isinstance(room, str):
+                if room not in observed:
+                    issues.append(_issue(codes.OBSERVATION_REQUIRED, f"Detection for '{room}' requires an in-scope inspection first.", "Inspect the room before detecting changes.", step_id=step.step_id, field="parameters.room"))
+                detected.add(room)
+            elif step.skill == "update_digital_twin" and isinstance(room, str):
+                if room not in detected:
+                    issues.append(_issue(codes.DETECTION_REQUIRED, f"Digital Twin update for '{room}' has no prior detection step.", "Run detect_environment_change for this room first.", step_id=step.step_id, field="parameters.room"))
+                updated.add(room)
+            elif step.skill == "generate_alert" and isinstance(room, str):
+                if room not in detected or room not in updated:
+                    issues.append(_issue(codes.TWIN_UPDATE_REQUIRED, f"Alert for '{room}' must follow detection and its Digital Twin update.", "Detect and update the room before generating its alert.", step_id=step.step_id, field="parameters.room"))
+    elif baseline_mode == "record_current" and "detect_environment_change" in skills:
+        issues.append(_issue(codes.BASELINE_REQUIRED, "A baseline-recording task cannot detect against the observations it is recording.", "Run a separate normal-reference patrol after recording the baseline.", field="steps"))
     if "inject_household_events" in skills or "establish_household_baseline" in skills:
         baselines: set[str] = set(); observed_after_events: set[str] = set(); detected: set[str] = set(); twin_updated: set[str] = set()
         events_injected = False; report_index: int | None = None

@@ -1,8 +1,10 @@
 """Seeded, headless household simulator; it is not a physics or ROS simulator."""
 from __future__ import annotations
 
-from collections import deque
 from copy import deepcopy
+from heapq import heappop, heappush
+from itertools import permutations
+from math import hypot
 import random
 from typing import Any
 
@@ -64,6 +66,54 @@ def layout_route(rooms: list[str]) -> list[list[float]]:
         if names[0] != start: names = tuple(reversed(names))
         points.extend(list(LAYOUT_WAYPOINTS[name]) for name in names[1:])
     return points
+
+
+def layout_route_cost(rooms: list[str]) -> float:
+    """Length of a legal room route, measured along visible waypoints and doors."""
+    points = layout_route(rooms)
+    return sum(hypot(right[0] - left[0], right[1] - left[1]) for left, right in zip(points, points[1:]))
+
+
+def legal_room_route(start: str, target: str, blocked: set[frozenset[str]] | None = None) -> list[str]:
+    """Shortest legal room route using the House2D waypoint/door geometry."""
+    blocked = blocked or set()
+    queue: list[tuple[float, tuple[str, ...]]] = [(0.0, (start,))]
+    best: dict[str, tuple[float, tuple[str, ...]]] = {start: (0.0, (start,))}
+    while queue:
+        cost, path = heappop(queue)
+        current = path[-1]
+        if (cost, path) != best.get(current):
+            continue
+        if current == target:
+            return list(path)
+        for edge in sorted(LAYOUT_CONNECTIONS, key=lambda item: tuple(sorted(item))):
+            if current not in edge or edge in blocked:
+                continue
+            neighbor = next(room for room in edge if room != current)
+            candidate = path + (neighbor,)
+            candidate_cost = cost + layout_route_cost([current, neighbor])
+            candidate_value = (candidate_cost, candidate)
+            if neighbor not in best or candidate_value < best[neighbor]:
+                best[neighbor] = candidate_value
+                heappush(queue, candidate_value)
+    raise BackendError(f"No legal route from '{start}' to '{target}'.")
+
+
+def visit_route_cost(order: list[str], *, start: str = "charging_area", finish: str = "charging_area") -> float:
+    """Total legal waypoint distance for visiting every room and returning safely."""
+    route = [start, *order, finish]
+    return sum(layout_route_cost(legal_room_route(left, right)) for left, right in zip(route, route[1:]))
+
+
+def optimized_visit_order(requested_rooms: list[str]) -> tuple[list[str], float]:
+    """Enumerate this small house's tours; ties retain the caller's stable room order."""
+    rooms = list(dict.fromkeys(room for room in requested_rooms if room != "charging_area"))
+    if not rooms:
+        return [], 0.0
+    rank = {room: index for index, room in enumerate(rooms)}
+    candidates = ((visit_route_cost(list(order)), tuple(rank[room] for room in order), list(order)) for order in permutations(rooms))
+    cost, _, order = min(candidates)
+    return order, round(cost, 4)
 
 
 def layout_location(point: list[float]) -> str:
@@ -133,20 +183,21 @@ class House2DBackend(RobotBackend):
         self._state = {"room": "charging_area", "pose": list(ROOMS["charging_area"]["center"]), "battery": float(battery), "time": 0.0, "stopped": False, "visit_history": ["charging_area"], "baselines": {}, "twin": {}, "alerts": []}
         self._initial = deepcopy(self.current_robot_state())
         self._observations, self._routes = [], []
-        self._events_active, self._transient_used = self.scenario is not None and not any(step.skill == "inject_household_events" for step in task.steps), False
+        # A natural-language scenario describes the current household state.
+        # Legacy event-list runs still use their explicit injection stage.
+        self._events_active, self._transient_used = self.scenario is not None, False
         self._execution_failures = []
         self._application = HouseSitterApplication(task.name, self.seed)
-        if self.scenario is not None:
-            # Reference state is internal simulation configuration.  Runtime
-            # detection below still receives only actual onboard observations.
-            for room, truth in rooms.items():
-                reference = {"observation_id": f"reference:{room}:{self.seed}", "room": room, "timestamp": 0.0,
-                             "visible_object_identifiers": list(truth["static_objects"]), "obstacle_present": False,
-                             "temperature_c": truth["temperature_c"], "humidity_percent": truth["humidity_percent"],
-                             "transition_accessibility": {neighbor: True for a, b in DOORS for neighbor in ([b] if a == room else [a] if b == room else [])},
-                             "observation_valid": True}
-                self._application.observe(reference, baseline=True)
-            self._application.capture_before()
+        # Reference state is internal simulation configuration. Runtime
+        # detection receives only onboard observations, never scenario labels.
+        for room, truth in rooms.items():
+            reference = {"observation_id": f"reference:{room}:{self.seed}", "room": room, "timestamp": 0.0,
+                         "visible_object_identifiers": list(truth["static_objects"]), "obstacle_present": False,
+                         "temperature_c": truth["temperature_c"], "humidity_percent": truth["humidity_percent"],
+                         "transition_accessibility": {neighbor: True for a, b in DOORS for neighbor in ([b] if a == room else [a] if b == room else [])},
+                         "observation_valid": True}
+            self._application.observe(reference, baseline=True)
+        self._application.capture_before()
 
     def available_capabilities(self) -> set[str]:
         return set(ALL_SKILLS)
@@ -173,18 +224,7 @@ class House2DBackend(RobotBackend):
         return {frozenset(door) for item in self._active_event_records(kind="blocked_transition") for door in item["parameters"]["doors"]}
 
     def _route(self, start: str, target: str) -> list[str]:
-        queue: deque[list[str]] = deque([[start]])
-        blocked = self._blocked_doors()
-        while queue:
-            path = queue.popleft()
-            current = path[-1]
-            if current == target:
-                return path
-            for a, b in DOORS:
-                neighbor = b if a == current else a if b == current else None
-                if neighbor is not None and neighbor not in path and frozenset((current, neighbor)) not in blocked:
-                    queue.append(path + [neighbor])
-        raise BackendError(f"No legal route from '{start}' to '{target}'.")
+        return legal_room_route(start, target, self._blocked_doors())
 
     def _move(self, target: str, timeout_seconds: float) -> dict[str, Any]:
         if target not in ROOMS:
@@ -200,7 +240,7 @@ class House2DBackend(RobotBackend):
         self._state["battery"] -= battery_cost
         self._state["room"], self._state["pose"] = target, list(ROOMS[target]["center"])
         self._state["visit_history"].append(target)
-        route_record = {"timestamp": self._state["time"], "from_room": route[0], "to_room": target, "rooms": route, "duration_seconds": duration, "battery_consumed": battery_cost}
+        route_record = {"timestamp": self._state["time"], "from_room": route[0], "to_room": target, "rooms": route, "path_length": round(layout_route_cost(route), 4), "duration_seconds": duration, "battery_consumed": battery_cost}
         self._routes.append(route_record)
         return {"entered_room": target, "route": route, "simulation_time": self._state["time"], "battery": self._state["battery"], "simulation_only": True}
 

@@ -119,11 +119,12 @@ class HouseSitterApplication:
         return deepcopy(alert)
 
     def render_report(self, final_state: dict[str, Any], execution_success: bool | None = None) -> str:
-        valid = sum(1 for item in self.observations if item["observation_valid"])
+        onboard = [item for item in self.observations if item["observation_id"].startswith("observation:")]
+        valid = sum(1 for item in onboard if item["observation_valid"])
         success = bool(execution_success) and final_state["room"] == "charging_area" and final_state["stopped"]
         lines = ["# RaPToR-Lite House-Sitter Monitoring Report", "", f"- Task: {self.task_name}", f"- Scenario seed: {self.seed}",
                  f"- Rooms planned: living_room, kitchen, bedroom, bathroom", f"- Rooms visited: {', '.join(final_state['visit_history'])}",
-                 f"- Successful observations: {valid}", f"- Failed observations: {len(self.observations) - valid}",
+                 f"- Successful observations: {valid}", f"- Failed observations: {len(onboard) - valid}",
                  f"- Detected anomalies: {len(self.anomalies)}", f"- Digital Twin updates: {sum(1 for item in self.updates if item['updated'])}",
                  f"- Generated alerts: {len(self.alerts)}", f"- Return to start: {final_state['room'] == 'charging_area'}", f"- Battery usage: {final_state['battery']:.1f}% remaining", f"- Execution duration: {final_state['time']:.1f}s", f"- Overall success: {success}", "",
                  "## Detected anomalies"]

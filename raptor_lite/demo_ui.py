@@ -134,7 +134,7 @@ class DemoController:
         backend = House2DBackend(seed=seed, scenario={**self.scenario_planning["candidate_scenario"], "validation_status": "approved"})
         self.result, self.trace = BackendExecutor(backend).run(self.planning.candidate_task, self.report, self.registry)
         self.bundle = backend.artifact_bundle()
-        feedback = build_feedback(self.planning.extracted_rooms, self.trace, self.bundle, execution_success=self.result.success)
+        feedback = build_feedback(self.planning.candidate_task.metadata.get("optimized_visit_order", self.planning.extracted_rooms), self.trace, self.bundle, execution_success=self.result.success)
         self.bundle["robot_feedback"] = feedback
         self.playback_trace = self._expand_playback_trace()
         self.artifact_dir = write_planning_run(self.artifact_root, self.planning, self.registry.as_json(), self.report, self.result, self.trace, backend, scenario_input=self.scenario_input, scenario_plan=self.scenario_planning, scenario_report=self.scenario_report, robot_feedback=feedback, robot_feedback_markdown=feedback_markdown(feedback))
@@ -239,8 +239,10 @@ class DemoController:
         trace_count = visual["trace_count"]
         frame = {"current_room": layout_location(visual["position"]), "pose": visual["position"], "battery": initial.get("battery"), "simulation_time": initial.get("time", 0.0), "visited_rooms": list(initial.get("visit_history", [])), "routes": [], "events": [], "visual_events": self.bundle.get("visual_event_manifest", {}).get("events", []), "observations": [], "anomalies": [], "twin_updates": [], "alerts": [], "report": None, "stopped": False, "task_phase": "ready", "trace_count": trace_count, "playback_action": visual["action"], "goal": visual["goal"], "waypoint": visual["waypoint"], "patrol_phase": visual["phase"], "observation_status": visual["observation_status"], "travelled_path": [entry["position"] for entry in self.playback_trace[:self.index]], "planned_path": []}
         event_records = self.bundle.get("scenario_ground_truth", {}).get("events", [])
+        if any(event.get("timestamp") == 0.0 for event in event_records):
+            frame["events"] = [{key: event[key] for key in ("event_id", "type", "room")} for event in event_records]
         if self.index < len(self.playback_trace):
-            frame["planned_path"] = [entry["position"] for entry in self.playback_trace[self.index:] if entry.get("goal") == visual.get("goal")][:32]
+            frame["planned_path"] = [visual["position"], *[entry["position"] for entry in self.playback_trace[self.index:] if entry.get("action", "").startswith("Moving to the ")]]
         for item in self.trace[:trace_count]:
             detail = item.details
             frame["task_phase"] = item.step_id or item.event
@@ -333,8 +335,12 @@ class DemoController:
         return log
 
     def _summary(self, frame: dict[str, Any]) -> dict[str, Any]:
-        base = {"current_room": "Waiting for a task", "current_location": "Waiting for a task", "current_action": "Not started", "current_goal": "Waiting for verification", "route": "Not started", "patrol_phase": "Waiting", "observation_status": "Not started", "newly_detected_change": "No anomaly detected yet", "robot_status": "Waiting for verification", "safety_status": "Waiting for verification", "progress": {"completed": 0, "total": 0, "percent": 0}, "detected_anomalies": [], "digital_twin_status": "No Digital Twin update yet", "next_action": "Waiting for verification", "purpose": "Create and verify a task before the simulation can run.", "activity_log": []}
+        base = {"current_room": "Waiting for a task", "current_location": "Waiting for a task", "current_action": "Not started", "current_goal": "Waiting for verification", "next_room": "Waiting for verification", "optimized_visit_order": "Not planned", "planned_route": "Not planned", "travelled_route": "Not started", "route": "Not started", "patrol_phase": "Waiting", "observation_status": "Not started", "newly_detected_change": "No anomaly detected yet", "robot_status": "Waiting for verification", "safety_status": "Waiting for verification", "progress": {"completed": 0, "total": 0, "percent": 0}, "detected_anomalies": [], "digital_twin_status": "No Digital Twin update yet", "next_action": "Waiting for verification", "purpose": "Create and verify a task before the simulation can run.", "activity_log": []}
         if self.planning is None: return base
+        metadata = self.planning.candidate_task.metadata if self.planning.candidate_task else {}
+        order = [self._room(room) for room in metadata.get("optimized_visit_order", [])]
+        planned = ["charging area", *order, "charging area"] if order else []
+        base.update({"optimized_visit_order": " → ".join(order) or "No room visit", "planned_route": " → ".join(planned) or "No route"})
         if self.report is None:
             base.update({"current_action": "Task planned — not executing", "robot_status": "Awaiting verification", "next_action": "Validate the candidate task", "purpose": "Verification must approve the task before execution."}); return base
         if not self.report.approved:
@@ -343,7 +349,8 @@ class DemoController:
         if not total:
             base.update({"current_room": "Waiting to run", "current_action": "Task approved — not executing", "robot_status": "Ready to run", "next_action": "Run the verified task", "purpose": "The verifier approved this task for the local simulation."}); return base
         new_change = frame["anomalies"][-1] if frame["anomalies"] else None
-        base.update({"current_room": self._room(frame.get("current_room")), "current_location": self._room(frame.get("current_room")), "current_action": frame["playback_action"], "current_goal": self._room(frame.get("goal")) if frame.get("goal") else "Safe completion", "route": f"via {self._room(frame.get('waypoint'))}", "patrol_phase": frame["patrol_phase"], "observation_status": frame["observation_status"], "newly_detected_change": f"{new_change['anomaly_type'].replace('_', ' ')} in {self._room(new_change['room'])}" if new_change else "No anomaly detected yet", "safety_status": "Safe to continue", "progress": {"completed": completed, "total": total, "percent": round(100 * completed / total) if total else 0}, "detected_anomalies": frame["anomalies"], "digital_twin_status": "Digital Twin updated" if any(update.get("updated") for update in frame["twin_updates"]) else "No Digital Twin update yet", "activity_log": self._activity_log()})
+        next_move = next((entry.get("goal") for entry in self.playback_trace[completed:] if entry.get("action", "").startswith("Moving to the ")), None)
+        base.update({"current_room": self._room(frame.get("current_room")), "current_location": self._room(frame.get("current_room")), "current_action": frame["playback_action"], "current_goal": self._room(frame.get("goal")) if frame.get("goal") else "Safe completion", "next_room": self._room(next_move) if next_move else "Charging area", "travelled_route": " → ".join(self._room(room) for room in frame["visited_rooms"]), "route": f"via {self._room(frame.get('waypoint'))}", "patrol_phase": frame["patrol_phase"], "observation_status": frame["observation_status"], "newly_detected_change": f"{new_change['anomaly_type'].replace('_', ' ')} in {self._room(new_change['room'])}" if new_change else "No anomaly detected yet", "safety_status": "Safe to continue", "progress": {"completed": completed, "total": total, "percent": round(100 * completed / total) if total else 0}, "detected_anomalies": frame["anomalies"], "digital_twin_status": "Digital Twin updated" if any(update.get("updated") for update in frame["twin_updates"]) else "No Digital Twin update yet", "activity_log": self._activity_log()})
         failure = frame.get("failure")
         if failure:
             reason, next_action = self._failure_reason(str(failure)); base.update({"current_action": "Task execution stopped", "robot_status": "Safely stopped" if frame.get("stopped") else "Failed", "safety_status": "Safely stopped" if frame.get("stopped") else "Failure requires attention", "next_action": next_action, "purpose": reason}); return base
@@ -363,7 +370,7 @@ class DemoController:
         with self._lock:
             frame = self._frame()
             world = {**self.bundle.get("simulator_config", {"rooms": ROOMS, "doors": [list(item) for item in DOORS]}), "layout": HOUSE_LAYOUT}
-            feedback = build_feedback(self.planning.extracted_rooms if self.planning else [], self.trace, self.bundle, trace_count=frame["trace_count"], execution_success=None) if self.bundle else None
+            feedback = build_feedback(self.planning.candidate_task.metadata.get("optimized_visit_order", self.planning.extracted_rooms) if self.planning and self.planning.candidate_task else [], self.trace, self.bundle, trace_count=frame["trace_count"], execution_success=None) if self.bundle else None
             if self.index == len(self.playback_trace) and self.bundle: feedback = self.bundle.get("robot_feedback")
             return {"phase": self.phase, "busy": self._busy, "planning": self.planning.model_dump(mode="json") if self.planning else None, "scenario_planning": self.scenario_planning, "scenario_verification": self.scenario_report, "verification": self.report.model_dump(mode="json") if self.report else None, "execution": self.result.model_dump(mode="json") if self.result else None, "robot_feedback": feedback, "playback": {"index": self.index, "total": len(self.playback_trace), "paused": self.paused, "speed": self.speed, "frame": frame}, "summary": self._summary(frame), "world": world, "digital_twin_before": self.bundle.get("digital_twin_before"), "digital_twin_current": self._visible_twin(frame), "artifact_directory": str(self.artifact_dir) if self.artifact_dir else None, "artifact_files": self._artifact_files(), "simulation_only": True, "physical_robot_validated": False}
 
@@ -481,7 +488,8 @@ def _script() -> str:
     const fields = byId("summary-fields");
     fields.replaceChildren();
     const values = [
-      ["Current Location", summary.current_location], ["Current Action", summary.current_action], ["Current Goal", summary.current_goal], ["Route", summary.route],
+      ["Current Location", summary.current_location], ["Current Action", summary.current_action], ["Current Goal", summary.current_goal], ["Next Room", summary.next_room],
+      ["Optimized Visit Order", summary.optimized_visit_order], ["Planned Route", summary.planned_route], ["Travelled Route", summary.travelled_route], ["Route", summary.route],
       ["Patrol Phase", summary.patrol_phase], ["Observation Status", summary.observation_status], ["Newly Detected Change", summary.newly_detected_change],
       ["Robot Status", summary.robot_status], ["Progress", `${summary.progress.completed}/${summary.progress.total} (${summary.progress.percent}%)`],
       ["Safety Status", summary.safety_status], ["Detected Anomalies", summary.detected_anomalies.length ? summary.detected_anomalies.map((item) => `${item.anomaly_type.replaceAll("_", " ")} in ${item.room.replaceAll("_", " ")}`).join("; ") : "No anomaly detected yet"],

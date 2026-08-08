@@ -130,19 +130,15 @@ def test_continuous_playback_is_deterministic_and_reveals_changes_only_after_det
     assert all(((right[0] - left[0]) ** 2 + (right[1] - left[1]) ** 2) ** 0.5 <= 0.36 for left, right in zip(positions, positions[1:]))
     assert any(entry["waypoint"] == "hallway" for entry in first.playback_trace)
     state = first.state()
-    while state["playback"]["frame"]["trace_count"] < 13:
-        state = first.playback("step")
-        assert not state["playback"]["frame"]["anomalies"]
-    assert state["playback"]["frame"]["events"]  # physical changes exist after injection, not confirmed changes
+    assert state["playback"]["frame"]["events"] and not state["playback"]["frame"]["anomalies"]
     while not state["playback"]["frame"]["anomalies"]:
         state = first.playback("step")
     frame = state["playback"]["frame"]
-    assert frame["trace_count"] == 21 and {item["room"] for item in frame["anomalies"]} == {"kitchen"}
+    assert {item["room"] for item in frame["anomalies"]} == {"kitchen"}
     assert not any(update.get("updated") for update in frame["twin_updates"])
     state = first.playback("step")
-    assert state["playback"]["frame"]["trace_count"] == 22 and state["summary"]["digital_twin_status"] == "Digital Twin updated"
+    assert state["summary"]["digital_twin_status"] == "Digital Twin updated"
     while not any(item["room"] == "bathroom" for item in state["playback"]["frame"]["anomalies"]): state = first.playback("step")
-    assert state["playback"]["frame"]["trace_count"] == 31
 
 
 def test_continuous_playback_summary_controls_and_failed_routes_do_not_teleport(tmp_path):
@@ -209,5 +205,27 @@ def test_javascript_loads_without_parse_error_and_exposes_visible_failure_path(t
         assert result.returncode == 0
         assert not any(token in result.stderr for token in ("SyntaxError", "ReferenceError", "Uncaught", "<rect> attribute"))
         assert "Ready. Create or select a task." in result.stdout
+    finally:
+        server.shutdown(); server.server_close(); thread.join()
+
+
+def test_headless_browser_renders_final_route_feedback_and_summary_in_sync(tmp_path):
+    chrome = shutil.which("google-chrome")
+    if not chrome:
+        pytest.skip("Google Chrome is not installed for the browser rendering check.")
+    ui = controller(tmp_path)
+    ui.interpret_scenario("There is a box in the bedroom and the bathroom has high humidity.", 23)
+    ui.plan("Patrol the whole house and report anything unusual.")
+    assert ui.validate()["verification"]["approved"]
+    state = ui.run(23)
+    for _ in range(state["playback"]["total"]):
+        state = ui.playback("step")
+    server = make_server(ui, port=0); thread = threading.Thread(target=server.serve_forever); thread.start()
+    try:
+        profile = tmp_path / "chrome-final-profile"
+        result = subprocess.run([chrome, "--headless=new", "--no-sandbox", "--disable-gpu", f"--user-data-dir={profile}", "--virtual-time-budget=1000", "--dump-dom", f"http://127.0.0.1:{server.server_address[1]}/"], text=True, capture_output=True, timeout=30, check=False)
+        assert result.returncode == 0
+        for label in ("Optimized Visit Order", "Planned Route", "Travelled Route", "Robot Feedback", "An unexpected obstacle was detected in the bedroom", "High humidity was detected"):
+            assert label in result.stdout
     finally:
         server.shutdown(); server.server_close(); thread.join()

@@ -5,6 +5,7 @@ import re
 from typing import Iterable
 
 from .capability_registry import CapabilityRegistry
+from .house2d import optimized_visit_order, visit_route_cost
 from .models import PlanningResult, TaskSpec, TaskStep
 
 
@@ -60,11 +61,16 @@ class OfflineHouseSitterPlanner:
     def _has(text: str, phrases: Iterable[str]) -> bool:
         return any(phrase in text for phrase in phrases)
 
-    def _rooms(self, text: str) -> tuple[list[str], bool]:
-        found = [room for room, aliases in ROOM_ALIASES.items() if self._has(text, aliases)]
+    def _rooms(self, text: str) -> tuple[list[str], bool, bool]:
+        found: list[tuple[int, str]] = []
+        for room, aliases in ROOM_ALIASES.items():
+            positions = [text.find(alias) for alias in aliases if text.find(alias) >= 0]
+            if positions:
+                found.append((min(positions), room))
         all_rooms = self._has(text, ("all rooms", "every room", "each room", "whole house", "entire house", "the house"))
-        selected = [room for room in (*ROOMS, "charging_area") if room in found]
-        return (list(ROOMS) if all_rooms else selected), all_rooms
+        selected = [room for _, room in sorted(found)]
+        explicit_order = len(selected) > 1 and bool(re.search(r"\bthen\b", text))
+        return (list(ROOMS) if all_rooms else selected), all_rooms, explicit_order
 
     @staticmethod
     def _checks(text: str) -> list[str]:
@@ -83,7 +89,7 @@ class OfflineHouseSitterPlanner:
         steps.extend((self._step("return-to-charging-area", "return_to_start"), self._step("stop-safely", "stop"), self._step("generate-monitoring-report", "generate_monitoring_report")))
         return additions, reasons
 
-    def _task(self, intent: str, rooms: list[str], text: str, checks: list[str]) -> tuple[TaskSpec, list[str], dict[str, str]]:
+    def _task(self, intent: str, rooms: list[str], text: str, checks: list[str], *, explicit_order: bool, route_cost: float) -> tuple[TaskSpec, list[str], dict[str, str]]:
         steps: list[TaskStep] = []
         index = 0
 
@@ -91,28 +97,18 @@ class OfflineHouseSitterPlanner:
             nonlocal index
             index += 1; steps.append(self._step(f"{index:02d}-{skill.replace('_', '-')}{'-' + room if room else ''}", skill, room))
 
-        full = intent in {"complete_house_sitter", "detect_environment_changes"}
-        if full:
-            for room in ROOMS:
-                add("move_to_room", room); add("inspect_room", room); add("establish_household_baseline", room)
-            add("inject_household_events")
-            for room in rooms:
-                add("revisit_active_event_rooms", room); add("inspect_room", room); add("detect_environment_change", room); add("update_digital_twin", room)
+        for room in rooms:
+            add("move_to_room", room); add("inspect_room", room)
+            if intent == "establish_baseline":
+                add("establish_household_baseline", room)
+            elif room != "charging_area":
+                # House2D supplies a fixed simulation reference; detection still
+                # consumes only the inspection above, never scenario text.
+                add("detect_environment_change", room); add("update_digital_twin", room)
                 alert = self._step(f"{index + 1:02d}-generate-alert-{room}", "generate_alert", room)
                 alert.parameters["anomaly_type"] = "detected_anomaly"; index += 1; steps.append(alert)
-        else:
-            for room in rooms:
-                add("move_to_room", room); add("inspect_room", room)
-                if intent == "establish_baseline":
-                    add("establish_household_baseline", room)
-                elif room != "charging_area":
-                    # House2D supplies a fixed simulation reference; detection still
-                    # consumes only the inspection above, never scenario text.
-                    add("detect_environment_change", room); add("update_digital_twin", room)
-                    alert = self._step(f"{index + 1:02d}-generate-alert-{room}", "generate_alert", room)
-                    alert.parameters["anomaly_type"] = "detected_anomaly"; index += 1; steps.append(alert)
         additions, reasons = self._tail(text, steps)
-        return TaskSpec(task_id="nl-house-sitter-v1", name=f"Constrained House-Sitter {intent.replace('_', ' ')}", description="Deterministic simulation-only task created from constrained natural language.", robot_profile="create3_sim", steps=steps, metadata={"simulation_only": True, "physical_robot_supported": False, "planner_name": self.name, "planner_version": self.version, "checks": checks}), additions, reasons
+        return TaskSpec(task_id="nl-house-sitter-v1", name=f"Constrained House-Sitter {intent.replace('_', ' ')}", description="Deterministic simulation-only task created from constrained natural language.", robot_profile="create3_sim", steps=steps, metadata={"simulation_only": True, "physical_robot_supported": False, "planner_name": self.name, "planner_version": self.version, "checks": checks, "baseline_mode": "record_current" if intent == "establish_baseline" else "normal_reference", "visit_order_source": "explicit_user_order" if explicit_order else "legal_path_optimization", "optimized_visit_order": rooms, "planned_route_cost": route_cost}), additions, reasons
 
     def plan(self, original_text: str) -> PlanningResult:
         text = normalize_text(original_text)
@@ -124,7 +120,7 @@ class OfflineHouseSitterPlanner:
         unsupported = [item for item in (*UNSUPPORTED_ROOMS, *UNSUPPORTED_CAPABILITIES) if item in text]
         if unsupported:
             return PlanningResult(original_text=original_text, normalized_text=text, status="unsupported", unsupported_elements=unsupported, warnings=["The request needs a room or capability not declared by this simulation profile."], match_basis=["unsupported capability or room"])
-        rooms, all_rooms = self._rooms(text)
+        rooms, all_rooms, explicit_order = self._rooms(text)
         if "only" in text and all_rooms:
             return PlanningResult(original_text=original_text, normalized_text=text, status="needs_clarification", clarification_questions=["Should the patrol visit every room or only the named rooms?"], warnings=["The room scope is conflicting."], match_basis=["conflicting room scope"])
         checks = self._checks(text)
@@ -137,6 +133,8 @@ class OfflineHouseSitterPlanner:
                 return PlanningResult(original_text=original_text, normalized_text=text, status="needs_clarification", detected_intent="detect_environment_changes", extracted_checks=checks, clarification_questions=["Which room should be revisited for change detection?"], match_basis=["detection intent without room"])
             intent = "detect_environment_changes"
         elif self._has(text, ("baseline",)):
+            if not self._has(text, ("establish", "record")):
+                return PlanningResult(original_text=original_text, normalized_text=text, status="needs_clarification", clarification_questions=["Say 'establish' or 'record' to create a household baseline."], warnings=["Ordinary patrols use the fixed normal reference baseline."], match_basis=["baseline request is not explicit"])
             intent = "establish_baseline"; rooms = rooms or list(ROOMS)
         elif self._has(text, ("patrol", "monitor")):
             intent = "patrol"; rooms = rooms or list(ROOMS)
@@ -150,5 +148,12 @@ class OfflineHouseSitterPlanner:
             return PlanningResult(original_text=original_text, normalized_text=text, status="unsupported", unsupported_elements=["unmapped request"], warnings=["The request does not map to a declared House-Sitter capability."], match_basis=["no supported intent"])
         if intent in {"complete_house_sitter", "detect_environment_changes"} and "charging_area" in rooms:
             return PlanningResult(original_text=original_text, normalized_text=text, status="needs_clarification", detected_intent=intent, extracted_rooms=rooms, extracted_checks=checks, clarification_questions=["The charging area is a safe return location, not an active-event monitoring room; which household room should be revisited?"], match_basis=["unsupported event-revisit room"])
-        task, additions, reasons = self._task(intent, rooms, text, checks)
-        return PlanningResult(original_text=original_text, normalized_text=text, detected_intent=intent, extracted_rooms=rooms, extracted_checks=checks, candidate_task=task, confidence=1.0, match_basis=["deterministic keyword and room grammar"], automatically_added_steps=additions, automatic_addition_reasons=reasons, status="planned")
+        requested_rooms = list(rooms)
+        route_cost = 0.0
+        if "charging_area" not in rooms:
+            if explicit_order:
+                route_cost = round(visit_route_cost(rooms), 4)
+            else:
+                rooms, route_cost = optimized_visit_order(rooms)
+        task, additions, reasons = self._task(intent, rooms, text, checks, explicit_order=explicit_order, route_cost=route_cost)
+        return PlanningResult(original_text=original_text, normalized_text=text, detected_intent=intent, extracted_rooms=requested_rooms, extracted_checks=checks, candidate_task=task, confidence=1.0, match_basis=["deterministic keyword and room grammar"], automatically_added_steps=additions, automatic_addition_reasons=reasons, status="planned")

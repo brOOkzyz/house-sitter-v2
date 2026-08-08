@@ -6,6 +6,9 @@ from pathlib import Path
 import pytest
 
 from raptor_lite.demo_ui import DemoController, DemoError
+from raptor_lite.capability_registry import CapabilityRegistry
+from raptor_lite.house2d import visit_route_cost
+from raptor_lite.planner import OfflineHouseSitterPlanner
 from raptor_lite.scenario import plan_scenario, verify_scenario
 
 
@@ -89,3 +92,60 @@ def test_artifacts_seed_reset_and_run_gate(tmp_path):
     controller.reset(); assert controller.state()["robot_feedback"] is None and not controller.state()["playback"]["frame"]["visual_events"]
     second = run(ui(tmp_path / "second"), "Inspect the bedroom.", "There is a box in the bedroom.", 3)
     assert first["robot_feedback"] == second["robot_feedback"]
+
+
+def test_normal_reference_detects_current_scenarios_only_after_their_room_is_visited(tmp_path):
+    controller = ui(tmp_path)
+    controller.interpret_scenario("There is a box in the bedroom and the bathroom has high humidity.", 7)
+    controller.plan("Patrol the whole house and report anything unusual.")
+    assert controller.validate()["verification"]["approved"]
+    state = controller.run(7)
+    assert state["playback"]["frame"]["events"] and not state["playback"]["frame"]["anomalies"]
+    while not state["playback"]["frame"]["anomalies"]:
+        state = controller.playback("step")
+    assert {item["room"] for item in state["playback"]["frame"]["anomalies"]} == {"bathroom"}
+    for _ in range(state["playback"]["total"]):
+        state = controller.playback("step")
+    anomalies = {(item["room"], item["anomaly_type"]) for item in state["robot_feedback"]["detected_anomalies"]}
+    assert anomalies == {("bedroom", "unexpected_obstacle"), ("bathroom", "high_humidity")}
+    assert "reference:bedroom:7" == state["digital_twin_before"]["rooms"]["bedroom"]["provenance"]["observation_id"]
+    assert "unexpected obstacle was detected in the bedroom" in state["robot_feedback"]["final_message"].casefold()
+    assert "high humidity was detected" in state["robot_feedback"]["final_message"].casefold()
+
+
+def test_reference_baseline_does_not_absorb_abnormality_and_explicit_baseline_is_the_only_writer(tmp_path):
+    obstacle = run(ui(tmp_path / "obstacle"), "Patrol the bedroom.", "There is a box in the bedroom.", 11)
+    assert {item["anomaly_type"] for item in obstacle["robot_feedback"]["detected_anomalies"]} == {"unexpected_obstacle"}
+    dropout = run(ui(tmp_path / "dropout"), "Patrol the bedroom.", "The bedroom sensor observation is unavailable.", 11)
+    assert dropout["digital_twin_before"]["rooms"]["bedroom"]["provenance"]["observation_id"] == "reference:bedroom:11"
+    assert dropout["digital_twin_current"]["rooms"]["bedroom"]["revision"] == 0
+    controller = ui(tmp_path / "record")
+    controller.interpret_scenario("There is a box in the bedroom.", 11)
+    controller.plan("Establish a household baseline in the bedroom.")
+    assert controller.validate()["verification"]["approved"]
+    state = controller.run(11)
+    assert not state["robot_feedback"]["detected_anomalies"]
+    baseline = next(item for item in controller.bundle["baseline_observations"] if item["room"] == "bedroom")
+    assert baseline["observation_id"].startswith("observation:bedroom:")
+
+
+def test_temperature_scope_order_cost_and_seed_are_deterministic(tmp_path):
+    hot = run(ui(tmp_path / "hot"), "Inspect the kitchen.", "The kitchen is hot.", 19)
+    assert {item["anomaly_type"] for item in hot["robot_feedback"]["detected_anomalies"]} == {"high_temperature"}
+    hidden = run(ui(tmp_path / "hidden"), "Inspect the bedroom.", "There is a box in the kitchen.", 19)
+    assert not hidden["robot_feedback"]["detected_anomalies"] and "kitchen" not in hidden["robot_feedback"]["final_message"].casefold()
+    assert hidden["robot_feedback"]["unconfirmed_ground_truth_events"] == {"redacted": True}
+    planner = OfflineHouseSitterPlanner(CapabilityRegistry.from_yaml(PROFILE))
+    automatic = planner.plan("Patrol the whole house.").candidate_task
+    explicit = planner.plan("Inspect the bedroom, then the kitchen.").candidate_task
+    assert automatic and explicit
+    assert automatic.metadata["optimized_visit_order"] == ["living_room", "kitchen", "bathroom", "bedroom"]
+    assert automatic.metadata["planned_route_cost"] < visit_route_cost(["living_room", "kitchen", "bedroom", "bathroom"])
+    assert explicit.metadata["visit_order_source"] == "explicit_user_order"
+    assert explicit.metadata["optimized_visit_order"] == ["bedroom", "kitchen"]
+    assert planner.plan("Check the baseline in the bedroom.").status == "needs_clarification"
+    first = run(ui(tmp_path / "one"), "Patrol the whole house.", "There is a box in the bedroom and the bathroom has high humidity.", 19)
+    second = run(ui(tmp_path / "two"), "Patrol the whole house.", "There is a box in the bedroom and the bathroom has high humidity.", 19)
+    assert first["robot_feedback"] == second["robot_feedback"]
+    assert first["summary"]["optimized_visit_order"] == second["summary"]["optimized_visit_order"]
+    assert first["summary"]["planned_route"] == first["summary"]["travelled_route"]
