@@ -1,0 +1,25 @@
+schema_version: raptor-lite-experiment-v1
+experiment_mode: false
+seed: 12345
+task_text: Patrol the whole house and report anything unusual.
+scenario_distribution:
+  - name: normal
+    text: The home is normal.
+    weight: 1.0
+sensor:
+  noise_bound: 0.0
+  dropout_probability: 0.0
+resource:
+  initial_battery: null
+  battery_per_door: 4.0
+  inspection_battery_cost: 0.2
+  safe_return_margin: 2.0
+thresholds:
+  temperature_max: 28.0
+  humidity_max: 70.0
+ablations:
+  disable_capability_grounding: false
+  disable_verifier: false
+  disable_route_optimization: false
+  disable_resource_policy: false
+output_path: artifacts/raptor_lite/experiments

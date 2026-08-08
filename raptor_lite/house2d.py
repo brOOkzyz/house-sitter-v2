@@ -130,7 +130,7 @@ class House2DBackend(RobotBackend):
     name = "house2d"
     version = "1.0"
 
-    def __init__(self, seed: int | None = None, events: list[str] | None = None, initial_battery: float | None = None, sensor_noise_bound: float = 0.0, scenario: dict[str, Any] | None = None):
+    def __init__(self, seed: int | None = None, events: list[str] | None = None, initial_battery: float | None = None, sensor_noise_bound: float = 0.0, scenario: dict[str, Any] | None = None, *, battery_per_door: float = 4.0, inspection_battery_cost: float = 0.2, temperature_max: float = 28.0, humidity_max: float = 70.0):
         self.seed = seed if seed is not None else random.SystemRandom().randrange(1, 2**31)
         self.requested_events = list(events or [])
         unknown = set(self.requested_events) - EVENTS
@@ -143,6 +143,9 @@ class House2DBackend(RobotBackend):
         if self.scenario is not None and not verify_scenario({"status": "planned", "candidate_scenario": self.scenario}).get("approved"):
             raise ValueError("House2D refuses an invalid scenario.")
         self.sensor_noise_bound = max(0.0, float(sensor_noise_bound))
+        self.battery_per_door = max(0.0, float(battery_per_door))
+        self.inspection_battery_cost = max(0.0, float(inspection_battery_cost))
+        self.temperature_max, self.humidity_max = float(temperature_max), float(humidity_max)
         self._rng = random.Random(self.seed)
         self._state: dict[str, Any] = {}
         self._ground_truth: dict[str, Any] = {}
@@ -187,7 +190,7 @@ class House2DBackend(RobotBackend):
         # Legacy event-list runs still use their explicit injection stage.
         self._events_active, self._transient_used = self.scenario is not None, False
         self._execution_failures = []
-        self._application = HouseSitterApplication(task.name, self.seed)
+        self._application = HouseSitterApplication(task.name, self.seed, temperature_max=self.temperature_max, humidity_max=self.humidity_max)
         # Reference state is internal simulation configuration. Runtime
         # detection receives only onboard observations, never scenario labels.
         for room, truth in rooms.items():
@@ -231,7 +234,7 @@ class House2DBackend(RobotBackend):
             raise BackendError(f"Unknown room '{target}'.")
         route = self._route(self._state["room"], target)
         edges = len(route) - 1
-        duration, battery_cost = edges * 5.0, edges * 4.0
+        duration, battery_cost = edges * 5.0, edges * self.battery_per_door
         if duration > timeout_seconds:
             raise BackendError(f"Movement to '{target}' requires {duration:.1f}s, exceeding its {timeout_seconds:.1f}s timeout.")
         if battery_cost > self._state["battery"]:
@@ -250,7 +253,7 @@ class House2DBackend(RobotBackend):
         if timeout_seconds < 2.0:
             raise BackendError("Room inspection requires 2.0s of bounded simulation time.")
         self._state["time"] += 2.0
-        self._state["battery"] = max(0.0, self._state["battery"] - 0.2)
+        self._state["battery"] = max(0.0, self._state["battery"] - self.inspection_battery_cost)
         events = self._active_event_records(room)
         dropout = any(item["type"] == "observation_dropout" for item in events)
         truth = self._ground_truth["rooms"][room]
@@ -331,7 +334,7 @@ class House2DBackend(RobotBackend):
     def artifact_bundle(self) -> dict[str, Any]:
         application = self._application.artifacts() if self._application is not None else {}
         return {
-            "simulator_config": {"backend_name": self.name, "backend_version": self.version, "rooms": ROOMS, "doors": [list(item) for item in DOORS], "movement_seconds_per_door": 5.0, "battery_per_door": 4.0, "sensor_noise_bound": self.sensor_noise_bound, "simulation_only": True, "physical_robot_validated": False},
+            "simulator_config": {"backend_name": self.name, "backend_version": self.version, "rooms": ROOMS, "doors": [list(item) for item in DOORS], "movement_seconds_per_door": 5.0, "battery_per_door": self.battery_per_door, "inspection_battery_cost": self.inspection_battery_cost, "sensor_noise_bound": self.sensor_noise_bound, "temperature_max": self.temperature_max, "humidity_max": self.humidity_max, "simulation_only": True, "physical_robot_validated": False},
             "scenario_seed": {"seed": self.seed}, "scenario_ground_truth": deepcopy(self._ground_truth), "visual_event_manifest": {"events": [{"event_id": item["event_id"], "room": item["room"], "event_type": item["type"], "parameters": deepcopy(item.get("parameters", {})), "visual_representation": item.get("visual_representation", {"icon": "event", "label": item["type"]}), "simulation_only": True} for item in self._ground_truth.get("events", [])], "simulation_only": True}, "initial_world_state": deepcopy(self._initial), "final_world_state": self.current_robot_state(),
             "sensor_observations": self.observations(), "route_trace": deepcopy(self._routes), **application,
         }

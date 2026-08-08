@@ -26,8 +26,9 @@ def _anomaly(room: str, kind: str, severity: str, evidence: str, observed: Any, 
 class HouseSitterApplication:
     """Small room-level baseline, detection, Twin, alert, and report state."""
 
-    def __init__(self, task_name: str, seed: int):
+    def __init__(self, task_name: str, seed: int, *, temperature_max: float = TEMPERATURE_MAX, humidity_max: float = HUMIDITY_MAX):
         self.task_name, self.seed = task_name, seed
+        self.temperature_max, self.humidity_max = float(temperature_max), float(humidity_max)
         self.baselines: dict[str, dict[str, Any]] = {}
         self.latest: dict[str, dict[str, Any]] = {}
         self.observations: list[dict[str, Any]] = []
@@ -69,10 +70,10 @@ class HouseSitterApplication:
             found = []
             if observation["obstacle_present"] != baseline["obstacle_present"] or observation["visible_object_identifiers"] != baseline["visible_object_identifiers"]:
                 found.append(_anomaly(room, "unexpected_obstacle", "warning", "Visible objects or obstacle presence differ from the baseline.", observation["visible_object_identifiers"], baseline["visible_object_identifiers"], "baseline layout", timestamp, observation["observation_id"]))
-            if float(observation["temperature_c"]) > TEMPERATURE_MAX:
-                found.append(_anomaly(room, "high_temperature", "warning", "Observed temperature exceeds the safe monitoring threshold.", observation["temperature_c"], baseline["temperature_c"], TEMPERATURE_MAX, timestamp, observation["observation_id"]))
-            if float(observation["humidity_percent"]) > HUMIDITY_MAX:
-                found.append(_anomaly(room, "high_humidity", "warning", "Observed humidity exceeds the safe monitoring threshold.", observation["humidity_percent"], baseline["humidity_percent"], HUMIDITY_MAX, timestamp, observation["observation_id"]))
+            if float(observation["temperature_c"]) > self.temperature_max:
+                found.append(_anomaly(room, "high_temperature", "warning", "Observed temperature exceeds the safe monitoring threshold.", observation["temperature_c"], baseline["temperature_c"], self.temperature_max, timestamp, observation["observation_id"]))
+            if float(observation["humidity_percent"]) > self.humidity_max:
+                found.append(_anomaly(room, "high_humidity", "warning", "Observed humidity exceeds the safe monitoring threshold.", observation["humidity_percent"], baseline["humidity_percent"], self.humidity_max, timestamp, observation["observation_id"]))
             changed = [door for door, accessible in observation["transition_accessibility"].items() if accessible != baseline["transition_accessibility"].get(door)]
             if changed:
                 found.append(_anomaly(room, "blocked_transition", "warning", "Observed transition accessibility differs from the baseline.", changed, baseline["transition_accessibility"], "baseline accessibility", timestamp, observation["observation_id"]))

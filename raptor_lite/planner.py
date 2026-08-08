@@ -89,7 +89,7 @@ class OfflineHouseSitterPlanner:
         steps.extend((self._step("return-to-charging-area", "return_to_start"), self._step("stop-safely", "stop"), self._step("generate-monitoring-report", "generate_monitoring_report")))
         return additions, reasons
 
-    def _task(self, intent: str, rooms: list[str], text: str, checks: list[str], *, explicit_order: bool, route_cost: float) -> tuple[TaskSpec, list[str], dict[str, str]]:
+    def _task(self, intent: str, rooms: list[str], text: str, checks: list[str], *, explicit_order: bool, route_cost: float, visit_order_source: str) -> tuple[TaskSpec, list[str], dict[str, str]]:
         steps: list[TaskStep] = []
         index = 0
 
@@ -108,9 +108,9 @@ class OfflineHouseSitterPlanner:
                 alert = self._step(f"{index + 1:02d}-generate-alert-{room}", "generate_alert", room)
                 alert.parameters["anomaly_type"] = "detected_anomaly"; index += 1; steps.append(alert)
         additions, reasons = self._tail(text, steps)
-        return TaskSpec(task_id="nl-house-sitter-v1", name=f"Constrained House-Sitter {intent.replace('_', ' ')}", description="Deterministic simulation-only task created from constrained natural language.", robot_profile="create3_sim", steps=steps, metadata={"simulation_only": True, "physical_robot_supported": False, "planner_name": self.name, "planner_version": self.version, "checks": checks, "baseline_mode": "record_current" if intent == "establish_baseline" else "normal_reference", "visit_order_source": "explicit_user_order" if explicit_order else "legal_path_optimization", "optimized_visit_order": rooms, "planned_route_cost": route_cost}), additions, reasons
+        return TaskSpec(task_id="nl-house-sitter-v1", name=f"Constrained House-Sitter {intent.replace('_', ' ')}", description="Deterministic simulation-only task created from constrained natural language.", robot_profile="create3_sim", steps=steps, metadata={"simulation_only": True, "physical_robot_supported": False, "planner_name": self.name, "planner_version": self.version, "checks": checks, "baseline_mode": "record_current" if intent == "establish_baseline" else "normal_reference", "visit_order_source": visit_order_source, "optimized_visit_order": rooms, "planned_route_cost": route_cost}), additions, reasons
 
-    def plan(self, original_text: str) -> PlanningResult:
+    def plan(self, original_text: str, *, optimize_route: bool = True) -> PlanningResult:
         text = normalize_text(original_text)
         if not text:
             return PlanningResult(original_text=original_text, normalized_text=text, status="invalid", warnings=["The request is empty."], clarification_questions=["Describe a supported House-Sitter task."])
@@ -151,9 +151,10 @@ class OfflineHouseSitterPlanner:
         requested_rooms = list(rooms)
         route_cost = 0.0
         if "charging_area" not in rooms:
-            if explicit_order:
+            if explicit_order or not optimize_route:
                 route_cost = round(visit_route_cost(rooms), 4)
             else:
                 rooms, route_cost = optimized_visit_order(rooms)
-        task, additions, reasons = self._task(intent, rooms, text, checks, explicit_order=explicit_order, route_cost=route_cost)
+        source = "explicit_user_order" if explicit_order else "legal_path_optimization" if optimize_route else "input_order_ablation"
+        task, additions, reasons = self._task(intent, rooms, text, checks, explicit_order=explicit_order, route_cost=route_cost, visit_order_source=source)
         return PlanningResult(original_text=original_text, normalized_text=text, detected_intent=intent, extracted_rooms=requested_rooms, extracted_checks=checks, candidate_task=task, confidence=1.0, match_basis=["deterministic keyword and room grammar"], automatically_added_steps=additions, automatic_addition_reasons=reasons, status="planned")

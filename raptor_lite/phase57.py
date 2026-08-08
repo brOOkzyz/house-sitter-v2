@@ -80,11 +80,11 @@ class TwinHistory:
         return {"schema_version": "1.0", "rooms": deepcopy(self.rooms), "runs": deepcopy(self.runs), "simulation_only": True, "physical_robot_validated": False}
 
 
-def resource_decision(task: TaskSpec, robot_state: dict[str, Any]) -> dict[str, Any]:
+def resource_decision(task: TaskSpec, robot_state: dict[str, Any], *, battery_per_door: float = _BATTERY_PER_DOOR, inspection_battery_cost: float = _INSPECTION_BATTERY_COST, safety_margin: float = _SAFETY_MARGIN) -> dict[str, Any]:
     """Fail closed before movement when the idle robot cannot safely return."""
     activity = str(robot_state.get("activity", "idle"))
     battery, current = robot_state.get("battery"), robot_state.get("room")
-    base = {"schema_version": "1.0", "activity": activity, "battery_percent": battery, "estimated_task_cost": 0.0, "safe_return_reserve": 0.0, "safety_margin": _SAFETY_MARGIN, "required_battery": None, "simulation_only": True, "physical_robot_validated": False}
+    base = {"schema_version": "1.0", "activity": activity, "battery_percent": battery, "estimated_task_cost": 0.0, "safe_return_reserve": 0.0, "safety_margin": safety_margin, "required_battery": None, "simulation_only": True, "physical_robot_validated": False}
     if activity != "idle":
         return {**base, "decision": "DEFER", "reason": "The robot is not idle.", "recommended_action": "Wait for the active task to finish before starting a House-Sitter patrol."}
     if not isinstance(battery, (int, float)) or not isinstance(current, str):
@@ -97,19 +97,19 @@ def resource_decision(task: TaskSpec, robot_state: dict[str, Any]) -> dict[str, 
                 target = step.parameters.get("room")
                 if not isinstance(target, str):
                     raise ValueError("A movement step has no room target.")
-                cost += _BATTERY_PER_DOOR * (len(legal_room_route(current, target)) - 1)
+                cost += battery_per_door * (len(legal_room_route(current, target)) - 1)
                 current = target
             elif step.skill == "return_to_start":
-                last_return_cost = _BATTERY_PER_DOOR * (len(legal_room_route(current, "charging_area")) - 1)
+                last_return_cost = battery_per_door * (len(legal_room_route(current, "charging_area")) - 1)
                 cost += last_return_cost
                 current = "charging_area"
             elif step.skill == "inspect_room":
-                cost += _INSPECTION_BATTERY_COST
+                cost += inspection_battery_cost
     except Exception as exc:
         return {**base, "decision": "REJECT", "reason": f"The verified task has no legal resource estimate: {exc}", "recommended_action": "Revise the task through the verifier."}
     if last_return_cost is None:
         return {**base, "decision": "REJECT", "reason": "The task has no planned safe return to the charging area.", "recommended_action": "Add a verifier-approved return-to-start step."}
-    required = round(cost + _SAFETY_MARGIN, 3)
+    required = round(cost + safety_margin, 3)
     values = {**base, "estimated_task_cost": round(cost, 3), "safe_return_reserve": round(last_return_cost, 3), "required_battery": required}
     if float(battery) < required:
         return {**values, "decision": "DEFER", "reason": f"Battery {float(battery):.1f}% is below the {required:.1f}% needed for the estimated task, safe return, and margin.", "recommended_action": "Recharge at the charging area before starting the patrol."}
