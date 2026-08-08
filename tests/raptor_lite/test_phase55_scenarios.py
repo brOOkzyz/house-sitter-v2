@@ -68,8 +68,11 @@ def test_normal_obstacle_dropout_blocked_and_battery_feedback(tmp_path):
     assert "cannot confirm" in dropout["robot_feedback"]["final_message"].casefold() and dropout["digital_twin_current"]["rooms"]["bedroom"]["revision"] == 0
     blocked = run(ui(tmp_path / "blocked"), "Inspect the bedroom.", "The bedroom doorway is blocked.")
     assert "could not reach" in blocked["robot_feedback"]["final_message"].casefold() and not blocked["robot_feedback"]["rooms_visited"]
-    low = run(ui(tmp_path / "low"), "Inspect the bedroom.", "The available battery is low.")
-    assert "battery was insufficient" in low["robot_feedback"]["final_message"].casefold()
+    low = ui(tmp_path / "low")
+    low.confirm("Inspect the bedroom.", "The available battery is low.", 12345)
+    with pytest.raises(DemoError, match="Execution DEFER"):
+        low.run("Inspect the bedroom.", "The available battery is low.", 12345)
+    assert low.state()["resource_policy"]["decision"] == "DEFER" and not low.bundle
 
 
 def test_multi_room_events_have_distinct_icons_and_observation_backed_feedback(tmp_path):

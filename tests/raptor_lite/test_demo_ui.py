@@ -68,8 +68,10 @@ def test_failure_scenarios_preserve_actual_failure_and_safe_stop(tmp_path):
     ui.reset(); blocked = run_legacy(ui, "blocked")
     assert not blocked["execution"]["success"] and blocked["execution"]["first_failure"] and blocked["world"]
     assert ui.bundle["final_world_state"]["stopped"]
-    ui.reset(); low = run_legacy(ui, "low_battery")
-    assert not low["execution"]["success"] and "insufficient" in low["execution"]["first_failure"] and ui.bundle["final_world_state"]["stopped"]
+    ui.reset()
+    with pytest.raises(DemoError, match="Execution DEFER"):
+        run_legacy(ui, "low_battery")
+    assert ui.state()["resource_policy"]["decision"] == "DEFER" and not ui.bundle
 
 
 def test_pause_resume_step_restart_reset_and_concurrency_protection(tmp_path):
@@ -119,12 +121,16 @@ def test_live_summary_reports_dropouts_and_failures_without_false_success(tmp_pa
     assert any(item["anomaly_type"] == "missing_observation" for item in summary["detected_anomalies"])
     assert summary["digital_twin_status"] == "No Digital Twin update yet"
     assert any("observation in the kitchen was unavailable" in item["message"] for item in summary["activity_log"])
-    for scenario, reason, next_action in (("blocked", "A required transition is blocked", "Clear the route"), ("low_battery", "Insufficient battery", "increase the initial battery")):
+    for scenario, reason, next_action in (("blocked", "A required transition is blocked", "Clear the route"),):
         ui.reset(); state = run_legacy(ui, scenario)
         for _ in range(state["playback"]["total"]): state = ui.playback("step")
         summary = state["summary"]
         assert summary["robot_status"] == "Safely stopped" and summary["current_action"] == "Task execution stopped"
         assert reason in summary["purpose"] and next_action in summary["next_action"] and summary["next_action"] != "Task complete"
+    ui.reset()
+    with pytest.raises(DemoError, match="Execution DEFER"):
+        run_legacy(ui, "low_battery")
+    assert ui.state()["resource_policy"]["recommended_action"].startswith("Recharge")
 
 
 def test_continuous_playback_is_deterministic_and_reveals_changes_only_after_detection(tmp_path):
@@ -274,7 +280,7 @@ def test_headless_browser_renders_final_route_feedback_and_summary_in_sync(tmp_p
         profile = tmp_path / "chrome-final-profile"
         result = subprocess.run([chrome, "--headless=new", "--no-sandbox", "--disable-gpu", f"--user-data-dir={profile}", "--virtual-time-budget=1000", "--dump-dom", f"http://127.0.0.1:{server.server_address[1]}/"], text=True, capture_output=True, timeout=30, check=False)
         assert result.returncode == 0
-        for label in ("Optimized Visit Order", "Planned Route", "Travelled Route", "Robot Feedback", "An unexpected obstacle was detected in the bedroom", "High humidity was detected"):
+        for label in ("Optimized Visit Order", "Planned Route", "Travelled Route", "Robot Feedback", "Execution Resource Policy", "Twin History / Temporal Change", "An unexpected obstacle was detected in the bedroom", "High humidity was detected"):
             assert label in result.stdout
     finally:
         server.shutdown(); server.server_close(); thread.join()
