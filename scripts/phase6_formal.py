@@ -18,11 +18,15 @@ def canonical_hash(value: object) -> str:
     return sha256(json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode("utf-8")).hexdigest()
 
 
+def file_hash(path: str) -> str:
+    return sha256(Path(path).read_bytes()).hexdigest()
+
+
 def lock_hashes(value: dict, inputs: dict[str, object]) -> dict[str, str]:
     locked_protocol = deepcopy(value)
     locked_protocol["locks"].pop("protocol_hash", None)
     locked_protocol["locks"].pop("analysis_plan_hash", None)
-    locked_protocol["materialized_inputs"] = inputs
+    locked_protocol["materialized_input_payloads"] = inputs
     return {"protocol_hash": canonical_hash(locked_protocol), "analysis_plan_hash": canonical_hash({"frozen_head": value["frozen_head"], "analysis_plan": value["analysis_plan"]})}
 
 
@@ -49,6 +53,9 @@ def protocol(path: Path) -> dict:
     if sum(value["rq2"]["form_strata"].values()) != value["rq2"]["corpus_items"]:
         raise ValueError("RQ2 form strata do not sum to corpus_items.")
     rq1, corpus, rq3 = inputs["rq1_cases"], inputs["rq2_corpus"], inputs["rq3_seed_manifest"]
+    source_hashes = value["materialized_inputs"]
+    if source_hashes.get("materializer_sha256") != file_hash(source_hashes["generator_source"]) or source_hashes.get("counterfactual_evaluator_sha256") != file_hash(source_hashes["counterfactual_evaluator_source"]) or source_hashes.get("statistics_helper_sha256") != file_hash("scripts/phase6_statistics.py"):
+        raise ValueError("A locked Phase 6 materialization or analysis helper hash does not match its source.")
     if rq1.get("phase6_formal") is not True or len(rq1.get("cases", [])) != value["rq1"]["held_out_cases"] or rq1.get("strata") != value["rq1"]["strata"] or rq1.get("safe_repair_subset") != value["rq1"]["safe_repair_subset"]:
         raise ValueError("RQ1 materialized cases are inconsistent with the locked protocol.")
     if corpus.get("phase6_formal") is not True or corpus.get("item_count") != value["rq2"]["corpus_items"] or corpus.get("semantic_target_count") != value["rq2"]["semantic_targets"] or len(corpus.get("utterances", [])) != corpus["item_count"]:

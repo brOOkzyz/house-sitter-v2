@@ -1,6 +1,6 @@
 # RaPToR-Lite Phase 6A: formal experiment protocol
 
-This is Revision 1 of the pre-registered execution plan, not a result. It is pinned to frozen
+This is Revision 2 of the pre-registered execution plan, not a result. It is pinned to frozen
 HEAD `3540c8922a840f43df5292e3df81ce662d66be20`. Every formal artifact must be
 written below `results/raptor_lite/phase6_formal/` with
 `phase6_formal=true`, the frozen HEAD, protocol/analysis-plan hashes,
@@ -8,11 +8,18 @@ RQ/condition/seed/cohort, ground truth, manifest and reproducibility hash.
 Pilot directories are excluded. Future formal manifests must copy every field
 listed in `locks.future_manifest_fields` in the protocol config.
 
-Revision reason: pre-execution materialization of previously underspecified
-experimental cases; no formal results existed before revision. The locked
+Revision reason: pre-execution clarification of non-executing counterfactual
+ablation semantics; no formal results existed before revision. The locked
 inputs are `phase6_rq1_cases.json`, `phase6_rq2_corpus.yaml` and
 `phase6_rq3_seed_manifest.json`; the deterministic generator and integrity
 audit are `scripts/phase6_materialize_revision1.py`.
+
+RQ1 grounding and verifier ablations emit only `would_accept`, `would_reject`,
+`would_clarify`, counterfactual issues and ground-truth correctness. They never
+invoke an executor. RQ3 route optimisation is a real paired House2D execution;
+the resource-policy ablation records only whether a no-policy system *would*
+attempt a constraint-violating task. It never executes a full-policy DEFER
+case, and its result must not be called real unsafe execution.
 
 ## RQ1 — Verifier effectiveness
 

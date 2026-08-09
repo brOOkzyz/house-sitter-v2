@@ -9,6 +9,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = ROOT / "scripts/phase6_formal.py"
 MATERIALIZER = ROOT / "scripts/phase6_materialize_revision1.py"
+COUNTERFACTUALS = ROOT / "scripts/phase6_counterfactuals.py"
+STATISTICS = ROOT / "scripts/phase6_statistics.py"
 
 
 def test_phase6a_preflight_is_pinned_and_non_executing():
@@ -34,6 +36,18 @@ def test_phase6_revision1_materialized_inputs_pass_the_integrity_audit():
     result = subprocess.run([sys.executable, str(MATERIALIZER), "audit"], cwd=ROOT, text=True, capture_output=True)
     assert result.returncode == 0
     assert json.loads(result.stdout) == {"rq1_cases": 240, "rq1_repairable": 80, "rq2_targets": 40, "rq2_utterances": 320, "rq3_development": 100, "rq3_held_out": 300, "rq3_replays": 40, "status": "passed"}
+
+
+def test_phase6_revision2_counterfactual_ablations_are_non_executing_and_distinct():
+    result = subprocess.run([sys.executable, str(COUNTERFACTUALS), "self-test"], cwd=ROOT, text=True, capture_output=True)
+    assert result.returncode == 0
+    assert json.loads(result.stdout) == {"paired_seed_alignment": 400, "rq1_ablation_decisions_differ": True, "resource_counterfactual_non_executing": True, "status": "passed", "unsafe_executor_invocations": 0}
+
+
+def test_phase6_statistics_self_test_locks_paired_mcnemar_and_effect_size_math():
+    result = subprocess.run([sys.executable, str(STATISTICS), "self-test"], cwd=ROOT, text=True, capture_output=True)
+    assert result.returncode == 0
+    assert json.loads(result.stdout) == {"absolute_difference_pp": 50.0, "counterfactual_only": 2, "exact_mcnemar_pvalue": 0.5, "full_only": 0, "n_pairs": 4, "status": "passed"}
 
 
 def test_phase6a_run_command_refuses_to_create_formal_data():
