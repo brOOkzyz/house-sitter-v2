@@ -54,7 +54,7 @@ def protocol(path: Path) -> dict:
         raise ValueError("RQ2 form strata do not sum to corpus_items.")
     rq1, corpus, rq3 = inputs["rq1_cases"], inputs["rq2_corpus"], inputs["rq3_seed_manifest"]
     source_hashes = value["materialized_inputs"]
-    if source_hashes.get("materializer_sha256") != file_hash(source_hashes["generator_source"]) or source_hashes.get("counterfactual_evaluator_sha256") != file_hash(source_hashes["counterfactual_evaluator_source"]) or source_hashes.get("statistics_helper_sha256") != file_hash("scripts/phase6_statistics.py"):
+    if source_hashes.get("materializer_sha256") != file_hash(source_hashes["generator_source"]) or source_hashes.get("validity_audit_sha256") != file_hash(source_hashes["validity_audit_source"]) or source_hashes.get("oracle_projection_sha256") != file_hash(source_hashes["oracle_projection_source"]) or source_hashes.get("protocol_validator_sha256") != file_hash(source_hashes["protocol_validator_source"]) or source_hashes.get("counterfactual_evaluator_sha256") != file_hash(source_hashes["counterfactual_evaluator_source"]) or source_hashes.get("statistics_helper_sha256") != file_hash("scripts/phase6_statistics.py"):
         raise ValueError("A locked Phase 6 materialization or analysis helper hash does not match its source.")
     if rq1.get("phase6_formal") is not True or len(rq1.get("cases", [])) != value["rq1"]["held_out_cases"] or rq1.get("strata") != value["rq1"]["strata"] or rq1.get("safe_repair_subset") != value["rq1"]["safe_repair_subset"]:
         raise ValueError("RQ1 materialized cases are inconsistent with the locked protocol.")
@@ -67,6 +67,8 @@ def protocol(path: Path) -> dict:
         raise ValueError("RQ3 logical_runs is inconsistent with its conditions.")
     if len(rq3.get("development", [])) != 100 or len(rq3.get("held_out", [])) != 300 or len(rq3.get("replay_seeds", [])) != value["rq3"]["reproducibility_replays"]:
         raise ValueError("RQ3 materialized seed manifest is inconsistent with the locked protocol.")
+    if value["rq3"].get("excluded_unrepresentable_randomization") != ["event_time", "event_duration"] or any(not row.get("scenario", {}).get("scenario_events") or "event_time_stage" in row["scenario"] or "event_duration_stages" in row["scenario"] for row in [*rq3["development"], *rq3["held_out"]]):
+        raise ValueError("RQ3 materialized truth must use direct events and exclude unsupported temporal variables.")
     hashes = lock_hashes(value, inputs)
     if value.get("locks", {}).get("hash_algorithm") != "sha256-canonical-json-v1" or any(value["locks"].get(key) != digest for key, digest in hashes.items()):
         raise ValueError("Protocol or analysis-plan hash is missing or does not match the locked content.")

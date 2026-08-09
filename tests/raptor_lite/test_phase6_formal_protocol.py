@@ -8,9 +8,11 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = ROOT / "scripts/phase6_formal.py"
-MATERIALIZER = ROOT / "scripts/phase6_materialize_revision1.py"
+MATERIALIZER = ROOT / "scripts/phase6_independent_oracle.py"
 COUNTERFACTUALS = ROOT / "scripts/phase6_counterfactuals.py"
 STATISTICS = ROOT / "scripts/phase6_statistics.py"
+VALIDITY_AUDIT = ROOT / "scripts/phase6_validity_audit.py"
+ORACLE_PROJECTION = ROOT / "scripts/phase6_oracle_projection.py"
 
 
 def test_phase6a_preflight_is_pinned_and_non_executing():
@@ -32,10 +34,22 @@ def test_phase6a_analysis_plan_locks_grouped_rq2_and_held_out_rq3_rules():
     assert "taskspec_exact_match" in payload["rq_metrics"]["rq2"]["primary"]
 
 
-def test_phase6_revision1_materialized_inputs_pass_the_integrity_audit():
+def test_phase6_revision3_independent_materialized_inputs_pass_the_integrity_audit():
     result = subprocess.run([sys.executable, str(MATERIALIZER), "audit"], cwd=ROOT, text=True, capture_output=True)
     assert result.returncode == 0
     assert json.loads(result.stdout) == {"rq1_cases": 240, "rq1_repairable": 80, "rq2_targets": 40, "rq2_utterances": 320, "rq3_development": 100, "rq3_held_out": 300, "rq3_replays": 40, "status": "passed"}
+
+
+def test_phase6_revision3_validity_audit_rejects_evaluated_component_dependencies():
+    result = subprocess.run([sys.executable, str(VALIDITY_AUDIT), "audit"], cwd=ROOT, text=True, capture_output=True)
+    assert result.returncode == 0
+    assert json.loads(result.stdout) == {"active_oracle": "scripts/phase6_independent_oracle.py", "banned_component_imports": 0, "rq1_independent": True, "rq2_independent": True, "rq3_independent": True, "status": "passed"}
+
+
+def test_phase6_revision3_oracle_projection_is_a_pure_data_normalizer():
+    result = subprocess.run([sys.executable, str(ORACLE_PROJECTION), "self-test"], cwd=ROOT, text=True, capture_output=True)
+    assert result.returncode == 0
+    assert json.loads(result.stdout) == {"status": "passed"}
 
 
 def test_phase6_revision2_counterfactual_ablations_are_non_executing_and_distinct():

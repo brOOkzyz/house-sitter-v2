@@ -1,24 +1,30 @@
-# Phase 6A Revision 1. The preflight entry intentionally refuses execution.
+# Phase 6A Revision 3. The preflight entry intentionally refuses execution.
 phase6_formal: true
 execution_allowed: false
 frozen_head: 3540c8922a840f43df5292e3df81ce662d66be20
-protocol_revision: 2
-revision_reason: "pre-execution clarification of non-executing counterfactual ablation semantics; no formal results existed before revision."
+protocol_revision: 3
+revision_reason: "pre-execution replacement of system-derived labels with independent explicit oracle ground truth and independence guards; direct RQ3 scenario truth replaces unsupported temporal randomization; no formal results existed before revision."
 output_root: results/raptor_lite/phase6_formal
 artifact_requirements: [phase6_formal, frozen_head, protocol_hash, analysis_plan_hash, rq_id, condition, seed, analysis_cohort, confirmatory, ground_truth, manifest, reproducibility_hash]
 materialized_inputs:
   rq1_cases_source: configs/raptor_lite/phase6_rq1_cases.json
   rq2_corpus_source: configs/raptor_lite/phase6_rq2_corpus.yaml
   rq3_seed_manifest_source: configs/raptor_lite/phase6_rq3_seed_manifest.json
-  generator_source: scripts/phase6_materialize_revision1.py
+  generator_source: scripts/phase6_independent_oracle.py
+  validity_audit_source: scripts/phase6_validity_audit.py
+  oracle_projection_source: scripts/phase6_oracle_projection.py
+  protocol_validator_source: scripts/phase6_formal.py
   counterfactual_evaluator_source: scripts/phase6_counterfactuals.py
-  materializer_sha256: bd08a944e914e765b5d4917061db9f9144d773449785693c5b321658b3cfc927
+  materializer_sha256: f156b87ce4fb730d269d224fa8c33935c3cf6a7c146ea5f49d71695f2f3025d0
+  validity_audit_sha256: 1c7bcfcb8f2a9e3d0d98770ed82aba709e788452d89ef8443b4fab9a8454cc82
+  oracle_projection_sha256: 2262797cbd5979f49b2e88c7eb89f15f0df5bed500a5c269860f0a99d74f3d42
+  protocol_validator_sha256: a1717f178123425c903f660d27673d9df5177ec2f554a156ef2f00979e43d64b
   counterfactual_evaluator_sha256: 30a2d5caafdab76f27588094b013f1ad2afba6f250aff7e9f46635445b8d872e
   statistics_helper_sha256: 026ef00c83a2aa38d8a693af0b846febe443fa685e4ff98032a07aa640c95e7a
 locks:
   hash_algorithm: sha256-canonical-json-v1
-  protocol_hash: 7f0ce99e35ee4531665df244e7b9622c39ff3f9dd9f5d321b8af84548ea0a10a
-  analysis_plan_hash: 4729a1f4d0bb89606322c88d119712fde380a72068bbef7ce56e101f25fb9d2e
+  protocol_hash: 25a16e15fc07c2c9d3c76e52de067ca47f09950ac532bbbf1f14e611753c2847
+  analysis_plan_hash: fc1e1e1e20817435a80c0886715dcb25ce4ee3844e0ecf64f15c7189f34f9594
   future_manifest_fields: [phase6_formal, frozen_head, protocol_hash, analysis_plan_hash, rq_id, condition, seed, analysis_cohort, confirmatory, ground_truth, reproducibility_hash]
 statistics:
   confidence_level: 0.95
@@ -36,7 +42,7 @@ rq1:
   safe_repair_subset: 80
   primary_metrics: [acceptance_f1, rejection_f1, unsafe_catch_rate, false_rejection_rate, safe_repair_success]
   secondary_metrics: [acceptance_precision, acceptance_recall, rejection_precision, rejection_recall, false_accept_rate, issue_family_confusion]
-  ground_truth: labelled_task_decision_and_issue_family
+  ground_truth: independent_explicit_labelled_task_decision_and_issue_family
   materialized_cases: configs/raptor_lite/phase6_rq1_cases.json
   ablation_semantics:
     full_system: "planner plus capability grounding plus verifier; actual executor remains separately gated"
@@ -54,7 +60,7 @@ rq2:
   form_strata: {canonical: 40, paraphrase: 40, synonym: 40, explicit_order: 40, unordered_rooms: 40, ambiguity: 40, unsupported: 40, unsafe_or_verifier_bypass: 40}
   semantic_targets: 40
   logical_runs: 320
-  ground_truth: target_taskspec_or_expected_decision
+  ground_truth: independent_explicit_oracle_taskspec_or_expected_decision
   reporting_unit: {micro: utterance_320, macro_and_inference: semantic_target_40}
   primary_metrics: [taskspec_exact_match, clarification_accuracy, rejection_accuracy, end_to_end_correctness]
   secondary_metrics: [intent_correctness, parse_correctness, language_form_slices]
@@ -66,9 +72,11 @@ rq3:
   confirmatory_runs: {full_system: 300, route_optimization_disabled: 300, resource_policy_counterfactual: 300}
   reproducibility_replays: 40
   logical_runs: 1240
-  randomization: [room, event_type, event_time, event_duration, obstacle_location, sensor_noise, observation_dropout, initial_battery]
+  randomization: [room, event_type, direct_event_parameters, obstacle_location, sensor_noise, observation_dropout, initial_battery]
+  excluded_unrepresentable_randomization: [event_time, event_duration]
   paired_conditions: [full_system, route_optimization_disabled, resource_policy_counterfactual]
   seed_manifest: configs/raptor_lite/phase6_rq3_seed_manifest.json
+  ground_truth: independent_seeded_scenario_generator
   ablation_semantics:
     route_optimization_disabled: "paired House2D execution with optimize_route=false"
     resource_policy_counterfactual: "read-only no-policy would-attempt record; no executor call for a full-policy DEFER case"
@@ -80,12 +88,14 @@ rq3:
   primary_metrics: [mission_outcome, event_f1, twin_correctness, feedback_ground_truth_leakage, route_efficiency, safe_failure_rate]
   secondary_metrics: [event_precision, event_recall, route_cost, safe_defer_rate, unsafe_execution_rate, reproducibility]
 analysis_plan:
-  protocol_revision: 2
+  protocol_revision: 3
   materialized_input_sources: [configs/raptor_lite/phase6_rq1_cases.json, configs/raptor_lite/phase6_rq2_corpus.yaml, configs/raptor_lite/phase6_rq3_seed_manifest.json]
   counterfactual_analysis:
     rq1: "Use would_* decisions and counterfactual_issues only; report N/A for counterfactual safe-repair and real-execution outcomes."
     rq3_resource: "Report safe_defer and counterfactual_unsafe_attempt; never label this as real unsafe execution."
   analysis_implementation_source: scripts/phase6_statistics.py
+  oracle_projection_source: scripts/phase6_oracle_projection.py
+  independence_requirement: "Ground-truth oracle and validity audit must not import or call planner, verifier, detector, executor, or any raptor_lite module under evaluation."
   primary_comparisons:
     rq1: [full_system_vs_capability_grounding_ablation, full_system_vs_verifier_ablation]
     rq3: [full_system_vs_route_optimization_disabled, full_system_vs_resource_policy_counterfactual]
