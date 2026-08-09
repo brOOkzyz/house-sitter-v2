@@ -1,0 +1,66 @@
+# Phase 6A design only. The preflight entry intentionally refuses execution.
+phase6_formal: true
+execution_allowed: false
+frozen_head: 3540c8922a840f43df5292e3df81ce662d66be20
+output_root: results/raptor_lite/phase6_formal
+artifact_requirements: [phase6_formal, frozen_head, protocol_hash, analysis_plan_hash, rq_id, condition, seed, analysis_cohort, confirmatory, ground_truth, manifest, reproducibility_hash]
+locks:
+  hash_algorithm: sha256-canonical-json-v1
+  protocol_hash: 0375db022ce3cbbe3b5cc73a3882dafa8e5cad5ddc440baab361c77c7cc8471b
+  analysis_plan_hash: 11569749c80a3b6948b82a2e68cbbc27408c732164bceddef5e72c201f7a2007
+  future_manifest_fields: [phase6_formal, frozen_head, protocol_hash, analysis_plan_hash, rq_id, condition, seed, analysis_cohort, confirmatory, ground_truth, reproducibility_hash]
+statistics:
+  confidence_level: 0.95
+  bootstrap_resamples: 10000
+  paired_analysis: paired_bootstrap_percentile_ci
+  binary_secondary_test: exact_mcnemar
+  distribution_summary: [n, mean, std, median, iqr, p05, p95]
+  exploratory_multiple_comparison_control: benjamini_hochberg_fdr
+rq1:
+  title: Verifier effectiveness
+  held_out_cases: 240
+  strata: {valid: 48, invalid: 48, unsafe: 48, unsupported: 48, ambiguous: 48}
+  conditions: [full_system, capability_grounding_ablation, verifier_ablation]
+  logical_runs: 720
+  safe_repair_subset: 80
+  primary_metrics: [acceptance_f1, rejection_f1, unsafe_catch_rate, false_rejection_rate, safe_repair_success]
+  secondary_metrics: [acceptance_precision, acceptance_recall, rejection_precision, rejection_recall, false_accept_rate, issue_family_confusion]
+  ground_truth: labelled_task_decision_and_issue_family
+rq2:
+  title: Natural-language reliability
+  corpus_source: configs/raptor_lite/phase6_rq2_corpus.yaml
+  corpus_items: 320
+  form_strata: {canonical: 40, paraphrase: 40, synonym: 40, explicit_order: 40, unordered_rooms: 40, ambiguity: 40, unsupported: 40, unsafe_or_verifier_bypass: 40}
+  semantic_targets: 40
+  logical_runs: 320
+  ground_truth: target_taskspec_or_expected_decision
+  reporting_unit: {micro: utterance_320, macro_and_inference: semantic_target_40}
+  primary_metrics: [taskspec_exact_match, clarification_accuracy, rejection_accuracy, end_to_end_correctness]
+  secondary_metrics: [intent_correctness, parse_correctness, language_form_slices]
+rq3:
+  title: Stochastic House-Sitter reliability
+  independent_seeds: 400
+  seed_partitions: {development: 100, held_out: 300}
+  development_runs: {full_system: 100, route_optimization_disabled: 100, resource_policy_counterfactual: 100}
+  confirmatory_runs: {full_system: 300, route_optimization_disabled: 300, resource_policy_counterfactual: 300}
+  reproducibility_replays: 40
+  logical_runs: 1240
+  randomization: [room, event_type, event_time, event_duration, obstacle_location, sensor_noise, observation_dropout, initial_battery]
+  paired_conditions: [full_system, route_optimization_disabled, resource_policy_counterfactual]
+  primary_metrics: [mission_outcome, event_f1, twin_correctness, feedback_ground_truth_leakage, route_efficiency, safe_failure_rate]
+  secondary_metrics: [event_precision, event_recall, route_cost, safe_defer_rate, unsafe_execution_rate, reproducibility]
+analysis_plan:
+  primary_comparisons:
+    rq1: [full_system_vs_capability_grounding_ablation, full_system_vs_verifier_ablation]
+    rq3: [full_system_vs_route_optimization_disabled, full_system_vs_resource_policy_counterfactual]
+  effect_size_reporting:
+    rq1: [accept_reject_absolute_difference_pp, unsafe_catch_absolute_difference_pp, false_rejection_absolute_difference_pp]
+    rq3_route: [route_cost_paired_absolute_difference, route_efficiency_paired_absolute_difference]
+    rq3_resource: [safe_defer_absolute_difference_pp, unsafe_execution_absolute_difference_pp]
+  failure_taxonomy: [false_accept, false_reject, unsafe_miss, unsupported_capability_claim, clarification_error, taskspec_mismatch, observation_unavailable_or_stale, detector_tp_fp_fn, feedback_ground_truth_leakage, route_illegal_or_blocked, safe_return_or_dock_failure, twin_mismatch, resource_policy_unsafe_execution, timeout_or_communication_failure, reproducibility_mismatch]
+  inference:
+    confidence_intervals: {binary: wilson_95, continuous_and_paired: percentile_bootstrap_10000_95}
+    tests: {paired_binary: exact_mcnemar, paired_continuous: paired_bootstrap_percentile_ci}
+    multiple_comparisons: {primary_family: benjamini_hochberg_fdr_q_0_05_per_rq, secondary_and_slice_family: benjamini_hochberg_fdr_q_0_05_exploratory_per_rq, ci: unadjusted_descriptive_95}
+  analysis_entrypoint: "python scripts/phase6_formal.py analysis-plan"
+sample_size_rationale: "240/320 binary evaluations give worst-case 95% Wilson half-widths about 6.3/5.5 percentage points; 300 held-out RQ3 independent seeds support bootstrap intervals and failure slices while 100 development seeds remain disjoint. Replays are integrity checks, never independent evidence."
