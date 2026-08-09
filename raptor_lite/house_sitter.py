@@ -7,6 +7,19 @@ from typing import Any
 
 TEMPERATURE_MAX = 28.0
 HUMIDITY_MAX = 70.0
+GROUND_TRUTH_OR_PROVENANCE_FIELDS = frozenset({
+    "active_event_identifiers", "scenario_seed", "event_id", "event_type",
+    "events", "ground_truth", "run_id", "artifact_path", "output_path",
+    "synthetic", "simulated_onboard_sensor", "simulation_only",
+    "physical_robot_validated",
+})
+
+
+def assert_detector_safe_observation(observation: dict[str, Any]) -> None:
+    """Reject world-truth and run-provenance fields at the detector boundary."""
+    leaked = sorted(set(observation) & GROUND_TRUTH_OR_PROVENANCE_FIELDS)
+    if leaked:
+        raise ValueError(f"Detector observation contains forbidden ground-truth/provenance fields: {leaked}")
 
 
 def _anomaly(room: str, kind: str, severity: str, evidence: str, observed: Any, baseline: Any, threshold: Any, timestamp: float, observation_id: str) -> dict[str, Any]:
@@ -40,6 +53,7 @@ class HouseSitterApplication:
         self.report: str | None = None
 
     def observe(self, observation: dict[str, Any], *, baseline: bool = False) -> None:
+        assert_detector_safe_observation(observation)
         room = observation["room"]
         if not any(item["observation_id"] == observation["observation_id"] for item in self.observations):
             self.observations.append(deepcopy(observation))

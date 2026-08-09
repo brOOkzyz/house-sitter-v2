@@ -124,11 +124,12 @@ def layout_location(point: list[float]) -> str:
     return "hallway"
 EVENTS = {"unexpected_obstacle", "high_temperature", "high_humidity", "blocked_transition", "observation_dropout", "low_initial_battery", "transient_false_reading"}
 ALL_SKILLS = {"move_to_room", "inspect_room", "record_baseline", "establish_household_baseline", "inject_household_events", "revisit_active_event_rooms", "detect_environment_change", "update_digital_twin", "generate_alert", "generate_monitoring_report", "return_to_start", "stop"}
+ROBOT_OBSERVATION_FIELDS = frozenset({"observation_id", "room", "timestamp", "robot_state", "visit_index", "visible_object_identifiers", "obstacle_present", "temperature_c", "humidity_percent", "transition_accessibility", "battery", "observation_valid"})
 
 
 class House2DBackend(RobotBackend):
     name = "house2d"
-    version = "1.0"
+    version = "1.1"
 
     def __init__(self, seed: int | None = None, events: list[str] | None = None, initial_battery: float | None = None, sensor_noise_bound: float = 0.0, scenario: dict[str, Any] | None = None, *, battery_per_door: float = 4.0, inspection_battery_cost: float = 0.2, temperature_max: float = 28.0, humidity_max: float = 70.0):
         self.seed = seed if seed is not None else random.SystemRandom().randrange(1, 2**31)
@@ -194,7 +195,7 @@ class House2DBackend(RobotBackend):
         # Reference state is internal simulation configuration. Runtime
         # detection receives only onboard observations, never scenario labels.
         for room, truth in rooms.items():
-            reference = {"observation_id": f"reference:{room}:{self.seed}", "room": room, "timestamp": 0.0,
+            reference = {"observation_id": f"reference:{room}:baseline", "room": room, "timestamp": 0.0,
                          "visible_object_identifiers": list(truth["static_objects"]), "obstacle_present": False,
                          "temperature_c": truth["temperature_c"], "humidity_percent": truth["humidity_percent"],
                          "transition_accessibility": {neighbor: True for a, b in DOORS for neighbor in ([b] if a == room else [a] if b == room else [])},
@@ -274,9 +275,10 @@ class House2DBackend(RobotBackend):
             "temperature_c": None if dropout else (next((item["parameters"].get("temperature_c", 75.0) for item in events if item["type"] == "high_temperature"), truth["temperature_c"] + noise + (12.0 if transient else 0.0))),
             "humidity_percent": None if dropout else (next((item["parameters"].get("humidity_percent", 92.0) for item in events if item["type"] == "high_humidity"), truth["humidity_percent"] + noise)),
             "transition_accessibility": {} if dropout else accessibility,
-            "battery": self._state["battery"], "active_event_identifiers": [item["event_id"] for item in events], "observation_valid": not dropout,
-            "synthetic": True, "simulated_onboard_sensor": True, "simulation_only": True, "physical_robot_validated": False, "scenario_seed": self.seed,
+            "battery": self._state["battery"], "observation_valid": not dropout,
         }
+        if set(observation) != ROBOT_OBSERVATION_FIELDS:
+            raise BackendError("House2D attempted to emit an observation outside the onboard-equivalent schema.")
         self._observations.append(observation)
         if self._application is not None:
             self._application.observe(observation)
@@ -302,7 +304,7 @@ class House2DBackend(RobotBackend):
             assert self._application is not None
             self._application.capture_before()
             for item in self._ground_truth["events"]: item["timestamp"] = self._state["time"]
-            return {"events_injected": self.active_events(), "simulation_only": True}
+            return {"events_injected": True, "simulation_only": True}
         if skill == "detect_environment_change":
             assert self._application is not None
             room = str(parameters.get("room", self._state["room"])); found = self._application.detect(room); return {"room": room, "anomalies": found, "simulation_only": True}

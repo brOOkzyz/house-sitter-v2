@@ -113,7 +113,7 @@ def test_normal_reference_detects_current_scenarios_only_after_their_room_is_vis
         state = controller.playback("step")
     anomalies = {(item["room"], item["anomaly_type"]) for item in state["robot_feedback"]["detected_anomalies"]}
     assert anomalies == {("bedroom", "unexpected_obstacle"), ("bathroom", "high_humidity")}
-    assert "reference:bedroom:7" == state["digital_twin_before"]["rooms"]["bedroom"]["provenance"]["observation_id"]
+    assert "reference:bedroom:baseline" == state["digital_twin_before"]["rooms"]["bedroom"]["provenance"]["observation_id"]
     assert "unexpected obstacle was detected in the bedroom" in state["robot_feedback"]["final_message"].casefold()
     assert "high humidity was detected" in state["robot_feedback"]["final_message"].casefold()
 
@@ -122,7 +122,7 @@ def test_reference_baseline_does_not_absorb_abnormality_and_explicit_baseline_is
     obstacle = run(ui(tmp_path / "obstacle"), "Patrol the bedroom.", "There is a box in the bedroom.", 11)
     assert {item["anomaly_type"] for item in obstacle["robot_feedback"]["detected_anomalies"]} == {"unexpected_obstacle"}
     dropout = run(ui(tmp_path / "dropout"), "Patrol the bedroom.", "The bedroom sensor observation is unavailable.", 11)
-    assert dropout["digital_twin_before"]["rooms"]["bedroom"]["provenance"]["observation_id"] == "reference:bedroom:11"
+    assert dropout["digital_twin_before"]["rooms"]["bedroom"]["provenance"]["observation_id"] == "reference:bedroom:baseline"
     assert dropout["digital_twin_current"]["rooms"]["bedroom"]["revision"] == 0
     controller = ui(tmp_path / "record")
     controller.interpret_scenario("There is a box in the bedroom.", 11)

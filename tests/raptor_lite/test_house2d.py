@@ -84,9 +84,8 @@ def test_timeout_and_observations_keep_ground_truth_separate():
     else: raise AssertionError("short movement timeout was accepted")
     backend.execute("inject_household_events", {}, 5); backend.execute("move_to_room", {"room": "kitchen"}, 30)
     observation = backend.execute("inspect_room", {"room": "kitchen"}, 20)
-    assert observation["synthetic"] and observation["simulated_onboard_sensor"] and observation["simulation_only"]
-    assert observation["physical_robot_validated"] is False and "events" not in observation and observation["observation_valid"] is False
-    assert all("observation_dropout" not in event_id for event_id in observation["active_event_identifiers"])
+    forbidden = {"active_event_identifiers", "scenario_seed", "event_id", "event_type", "events", "ground_truth", "synthetic", "simulated_onboard_sensor", "simulation_only", "physical_robot_validated"}
+    assert not (forbidden & set(observation)) and observation["observation_valid"] is False
     kitchen_truth = backend.artifact_bundle()["scenario_ground_truth"]["rooms"]["kitchen"]
     assert "static_objects" in kitchen_truth and "static_objects" not in observation
     backend = House2DBackend(seed=3, events=["unexpected_obstacle", "high_temperature", "high_humidity"]); backend.initialize(task); backend.execute("inject_household_events", {}, 5)

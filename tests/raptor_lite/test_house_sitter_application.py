@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import copy
 import json
 import subprocess
 import sys
@@ -98,8 +97,7 @@ def test_dropout_is_missing_observation_without_twin_update_and_runtime_detector
     task = load_task(TASK_PATH); sensor = House2DBackend(seed=21, events=["unexpected_obstacle"]); sensor.initialize(task)
     sensor.execute("move_to_room", {"room": "kitchen"}, 30); baseline = sensor.execute("inspect_room", {"room": "kitchen"}, 20)
     sensor.execute("inject_household_events", {}, 5); changed = sensor.execute("inspect_room", {"room": "kitchen"}, 20)
-    clean = copy.deepcopy(changed); clean.pop("active_event_identifiers")
-    application = HouseSitterApplication("isolated", 21); application.observe(baseline, baseline=True); application.observe(clean)
+    application = HouseSitterApplication("isolated", 21); application.observe(baseline, baseline=True); application.observe(changed)
     assert {item["anomaly_type"] for item in application.detect("kitchen")} == {"unexpected_obstacle"}
 
 

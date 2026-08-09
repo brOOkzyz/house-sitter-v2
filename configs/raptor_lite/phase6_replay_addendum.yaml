@@ -1,0 +1,18 @@
+# Phase 6 execution addendum; it does not alter the locked experimental design.
+phase6_formal: true
+addendum_id: phase6-replay-normalization-v1
+base_protocol_hash: 25a16e15fc07c2c9d3c76e52de067ca47f09950ac532bbbf1f14e611753c2847
+base_analysis_plan_hash: fc1e1e1e20817435a80c0886715dcb25ce4ee3844e0ecf64f15c7189f34f9594
+reason: "replay normalization excludes non-scientific volatile provenance metadata; no outcome-dependent change to hypotheses, samples, metrics, labels or system behaviour."
+scientific_payload_schema: phase6-scientific-replay-v1
+scientific_fields: [seed, condition, scenario_input, task_spec, verifier_decision, resource_policy_decision, execution_guard, execution_result, trace, ground_truth, observations, route, detections, twin]
+volatile_provenance:
+  execution_result_fields: [start_timestamp, end_timestamp]
+  provenance_only_fields: [run_id, artifact_path, output_path, wall_clock_started_at, wall_clock_finished_at]
+  rule: "Simulation timestamps inside scenario, trace, observations, route, detections and Twin remain scientific fields."
+comparison_rule: "Both canonical scientific hashes must match; any non-allowlisted raw difference or any scientific difference fails reproducibility."
+replay_comparison_source: scripts/phase6_replay.py
+replay_comparison_sha256: 42d5cc2861fbc89c9d21cfbd555044a0bafefc83696965bb5251181135ee1ce9
+locks:
+  hash_algorithm: sha256-canonical-json-v1
+  addendum_hash: 68dd987fe6d8a4f9fd1e06b281f119e75d2640a481bc977f06a9dcae0767d57a

@@ -1,0 +1,30 @@
+# Applies only before admission of any RQ3 formal record.
+phase6_formal: true
+correction_id: phase6-rq3-world-observation-boundary-v1
+base_protocol_hash: 25a16e15fc07c2c9d3c76e52de067ca47f09950ac532bbbf1f14e611753c2847
+base_analysis_plan_hash: fc1e1e1e20817435a80c0886715dcb25ce4ee3844e0ecf64f15c7189f34f9594
+reason: "pre-RQ3 implementation correction: remove world-ground-truth and provenance from detector-visible observations; exclude unsupported obstacle-location randomization; no outcome-dependent change to hypotheses, samples, metrics, labels, thresholds, planner, verifier or detector algorithm."
+scope:
+  preserved_formal_artifacts: [RQ1_720, RQ2_320]
+  invalidated_unpersisted_artifacts: [RQ3_in_memory_1200, RQ3_in_memory_40_replays]
+  corrected_backend: {identity: house2d, version: "1.1", role: experimental}
+  corrected_rq3_source: configs/raptor_lite/phase6_rq3_corrected_seed_manifest.json
+  correction_precedes_rq3_formal_admission: true
+observation_boundary:
+  detector_input: RobotObservation
+  forbidden_fields: [active_event_identifiers, scenario_seed, event_id, event_type, events, ground_truth, run_id, artifact_path, output_path, synthetic, simulated_onboard_sensor, simulation_only, physical_robot_validated]
+  world_truth_and_provenance_location: [scenario_ground_truth, scenario_seed, simulator_config, formal_manifest]
+randomization:
+  consumed_dimensions: [room, event_type, event_parameters, sensor_noise_bound, observation_dropout, initial_battery]
+  excluded_dimension: unexpected_obstacle.position
+  rationale: "House2D has no spatial obstacle model; position is retained only as a fixed schema parameter and is not a formal random variable or claim."
+sources:
+  house2d_sha256: eab0c127bb3f3d9212baa68522efabceb317d025a9e8ca5dfc8f10f51895a0b7
+  house_sitter_sha256: 8c526515dfce8af51e69cda908a6d94ec0ae2d71e0d8a04839d2554c870018b2
+  corrected_materializer_sha256: f5c6c0cceaf56f5a878651ed50b57bb240a1da6ce20c1bc6553f6f0e72c6a088
+  corrected_seed_manifest_sha256: ffdd1c82b0bdf884768437da8dcf22ed8ca31b4758b32fd8bb60f12cfca2055b
+  consumption_audit_sha256: 5af68bc955a0b5c049981281876acba0493d333ba36bf5f3a5e5e6cbabb57f61
+  replay_addendum_hash: 68dd987fe6d8a4f9fd1e06b281f119e75d2640a481bc977f06a9dcae0767d57a
+locks:
+  hash_algorithm: sha256-canonical-json-v1
+  correction_hash: cae4f103e4777485397ec3b239d108c428fc20c2ebea994d1aa0c0afc9f550f9
