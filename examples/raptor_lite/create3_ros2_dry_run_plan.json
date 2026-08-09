@@ -1,0 +1,15 @@
+{
+  "task_id": "create3-ros2-readiness-001",
+  "name": "Create 3 ROS2 read-only readiness check",
+  "description": "Read live robot telemetry only; no motion, docking, undocking, or velocity command.",
+  "robot_profile": "create3_ros2_discovered",
+  "metadata": {"execution_mode": "ros2_dry_run", "physical_robot_supported": true, "physical_robot_validated": false},
+  "steps": [
+    {"step_id": "battery", "skill": "read_battery", "parameters": {}, "timeout_seconds": 2, "on_failure": "abort"},
+    {"step_id": "odometry", "skill": "read_odometry", "parameters": {}, "timeout_seconds": 2, "on_failure": "abort"},
+    {"step_id": "imu", "skill": "read_imu", "parameters": {}, "timeout_seconds": 2, "on_failure": "abort"},
+    {"step_id": "hazards", "skill": "read_hazards", "parameters": {}, "timeout_seconds": 2, "on_failure": "abort"},
+    {"step_id": "dock", "skill": "read_dock_status", "parameters": {}, "timeout_seconds": 2, "on_failure": "abort"},
+    {"step_id": "observation", "skill": "observe_robot_state", "parameters": {}, "timeout_seconds": 2, "on_failure": "abort"}
+  ]
+}

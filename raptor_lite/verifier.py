@@ -11,7 +11,7 @@ from .models import TaskSpec, VerificationIssue, VerificationReport
 
 
 FAILURE_POLICIES = {"abort", "continue", "stop"}
-SUPPORTED_ADAPTERS = {"mock"}
+SUPPORTED_ADAPTERS = {"mock", "ros2"}
 
 
 def _issue(code: str, message: str, fix: str, *, step_id: str | None = None, field: str | None = None) -> VerificationIssue:
@@ -35,6 +35,7 @@ def verify_task(task: TaskSpec | dict[str, Any], registry: CapabilityRegistry) -
     resolved: list[str] = []
     seen: set[str] = set()
     physical_requested = bool(parsed.metadata.get("physical_robot_supported", False))
+    execution_mode = str(parsed.metadata.get("execution_mode", "simulation"))
     for step in parsed.steps:
         if step.step_id in seen:
             issues.append(_issue(codes.DUPLICATE_STEP_ID, f"Step id '{step.step_id}' is duplicated.", "Use a unique step_id for every step.", step_id=step.step_id, field="step_id"))
@@ -48,8 +49,10 @@ def verify_task(task: TaskSpec | dict[str, Any], registry: CapabilityRegistry) -
             issues.append(_issue(codes.UNSUPPORTED_EXECUTION_MODE, f"Execution adapter '{capability.execution_adapter}' is not supported.", "Use the mock adapter in Phase 1.", step_id=step.step_id, field="skill"))
         if physical_requested and not capability.physical_robot_supported:
             issues.append(_issue(codes.UNSUPPORTED_EXECUTION_MODE, f"Skill '{step.skill}' is simulation-only.", "Set metadata.physical_robot_supported to false for this profile.", step_id=step.step_id, field="metadata.physical_robot_supported"))
-        if not capability.simulation_supported:
+        if execution_mode == "simulation" and not capability.simulation_supported:
             issues.append(_issue(codes.UNSUPPORTED_EXECUTION_MODE, f"Skill '{step.skill}' does not support simulation.", "Choose a simulation-supported skill.", step_id=step.step_id, field="skill"))
+        if execution_mode == "ros2_dry_run" and "motion" in capability.safety_constraints:
+            issues.append(_issue(codes.UNSUPPORTED_EXECUTION_MODE, f"Skill '{step.skill}' is motion-capable and denied in ROS2 dry-run mode.", "Use read-only telemetry skills or obtain explicit operator authorization outside dry-run mode.", step_id=step.step_id, field="skill"))
         if step.timeout_seconds is None or step.timeout_seconds <= 0:
             issues.append(_issue(codes.MISSING_TIMEOUT, "Every executable step needs a positive bounded timeout.", "Set timeout_seconds to a positive value.", step_id=step.step_id, field="timeout_seconds"))
         if step.on_failure not in FAILURE_POLICIES:
@@ -78,7 +81,8 @@ def verify_task(task: TaskSpec | dict[str, Any], registry: CapabilityRegistry) -
     patrol = "patrol" in parsed.name.casefold() or "house-sitter" in parsed.description.casefold() or "move_to_room" in skills
     if patrol and "return_to_start" not in skills:
         issues.append(_issue(codes.MISSING_SAFE_RETURN, "A patrol task must include return_to_start.", "Add a bounded return_to_start step before stop.", field="steps"))
-    if skills and skills[-1] not in {"stop", "return_to_start"} and not (skills[-1] == "generate_monitoring_report" and "stop" in skills[:-1]):
+    requires_safe_stop = patrol or any(registry.get(skill) and "motion" in registry.get(skill).safety_constraints for skill in skills)
+    if requires_safe_stop and skills and skills[-1] not in {"stop", "return_to_start"} and not (skills[-1] == "generate_monitoring_report" and "stop" in skills[:-1]):
         issues.append(_issue(codes.MISSING_SAFE_RETURN, "The task must end with stop or return_to_start.", "Add stop or return_to_start as the final step.", field="steps"))
     baseline_mode = parsed.metadata.get("baseline_mode")
     if baseline_mode == "normal_reference":

@@ -2,10 +2,12 @@
 from __future__ import annotations
 
 import argparse
+import json
 from pathlib import Path
 
 from .artifacts import write_planning_run, write_run
 from .capability_registry import CapabilityRegistry
+from .create3_ros2 import Create3ROS2Backend
 from .executor import BackendExecutor, MockExecutor
 from .house2d import EVENTS, House2DBackend
 from .models import ExecutionResult, VerificationReport
@@ -26,6 +28,9 @@ def _parser() -> argparse.ArgumentParser:
         command = sub.add_parser(name); command.add_argument("--text", required=True); command.add_argument("--profile", required=True, type=Path)
         if name == "run-text":
             command.add_argument("--backend", choices=["mock", "house2d"], default="mock"); command.add_argument("--seed", type=int); command.add_argument("--event", action="append", choices=sorted(EVENTS), default=[]); command.add_argument("--no-events", action="store_true"); command.add_argument("--initial-battery", type=float)
+    readiness = sub.add_parser("deployment-readiness", help="Discover a ROS 2 graph without commanding a robot.")
+    readiness.add_argument("--plan", type=Path, help="Optional read-only JSON plan to verify against discovered capabilities.")
+    readiness.add_argument("--output", type=Path, help="Optional JSON report path.")
     return parser
 
 
@@ -59,6 +64,25 @@ def _print_planning(planning, report, result, output) -> None:
 
 def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv)
+    if args.command == "deployment-readiness":
+        backend = Create3ROS2Backend()
+        try:
+            discovery = backend.discover()
+            payload = discovery.profile()
+            if args.plan:
+                task = load_task(args.plan)
+                report = verify_task(task, discovery.registry())
+                payload["plan"] = {"path": str(args.plan), "approved": report.approved, "issues": [item.model_dump(mode="json") for item in report.issues]}
+            if args.output:
+                args.output.parent.mkdir(parents=True, exist_ok=True)
+                args.output.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+            print(json.dumps(payload, indent=2, sort_keys=True))
+            return 0 if not args.plan or payload["plan"]["approved"] else 2
+        except Exception as exc:
+            print(json.dumps({"backend": "create3_ros2", "physical_robot_validated": False, "error": str(exc)}, indent=2, sort_keys=True))
+            return 3
+        finally:
+            backend.cleanup()
     registry = CapabilityRegistry.from_yaml(args.profile)
     args.registry = registry
     if args.command == "capabilities":
