@@ -1,0 +1,5 @@
+Metric,Micro result and 40-target grouped interval
+Decision,315/320; 98.4% (micro 95% CI 96.4–99.3); grouped 96.9–99.7%
+Intent,286/320; 89.4% (micro 95% CI 85.5–92.3); grouped 83.1–94.1%
+TaskSpec exact,272/320; 85.0% (micro 95% CI 80.7–88.5); grouped 73.8–94.4%
+End-to-end,253/320; 79.1% (micro 95% CI 74.3–83.2); grouped 67.8–88.8%
