@@ -32,9 +32,10 @@ def test_manifest_is_complete_and_reproducible_for_identical_config_and_seed(tmp
     first = ExperimentRunner(PROFILE).run(reproducible_config)
     second = ExperimentRunner(PROFILE).run(reproducible_config)
     manifest = first["manifest"]
-    for key in ("run_id", "timestamp", "git_commit", "config_hash", "seed", "inputs", "task_spec", "capability_profile", "verifier_decision", "resource_policy_decision", "ground_truth", "observations", "route", "detections", "twin", "final_outcome", "reproducibility_hash"):
+    for key in ("run_id", "timestamp", "git_commit", "config_hash", "seed", "inputs", "task_spec", "capability_profile", "backend", "verifier_decision", "resource_policy_decision", "ground_truth", "observations", "route", "detections", "twin", "final_outcome", "reproducibility_hash"):
         assert key in manifest
     assert manifest["simulation_only"] and not manifest["physical_robot_validated"]
+    assert manifest["backend"] == {"identity": "house2d", "version": "1.0", "role": "experimental", "simulation_only": True, "physical_robot_validated": False}
     assert manifest["final_outcome"]["success"] and manifest["ground_truth"]["events"]
     assert manifest["reproducibility_hash"] == second["manifest"]["reproducibility_hash"]
     assert manifest["observations"] == second["manifest"]["observations"]

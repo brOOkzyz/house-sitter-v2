@@ -14,3 +14,10 @@ def test_pilot_entry_is_loadable_and_keeps_all_ablations_disabled():
     assert config.output_path == "results/raptor_lite/pilot"
     assert (ROOT / config.output_path / ".gitkeep").is_file()
     assert "No pilot or Phase 6 result was run" in (ROOT / "docs/raptor_lite/phase59_pre_experiment_freeze.md").read_text()
+
+
+def test_phase511_refreeze_declares_experiment_and_deployment_boundaries():
+    report = (ROOT / "docs/raptor_lite/phase511_refreeze.md").read_text()
+    assert "House2D" in report and "experimental backend" in report
+    assert "Create3ROS2" in report and "deployment backend" in report
+    assert "physical_robot_validated=false" in report
