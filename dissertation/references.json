@@ -638,7 +638,7 @@
   },
   {
     "key": "ROS2Actions",
-    "sort_author": "ROS 2",
+    "sort_author": "Open Robotics",
     "authors": "Open Robotics",
     "title": "ROS 2 Jazzy Documentation: Topics, Services and Actions",
     "venue": "ROS 2 Documentation",
@@ -651,7 +651,7 @@
   },
   {
     "key": "ROS2QoS",
-    "sort_author": "ROS 2",
+    "sort_author": "Open Robotics",
     "authors": "Open Robotics",
     "title": "ROS 2 Jazzy Documentation: Quality of Service Settings",
     "venue": "ROS 2 Documentation",

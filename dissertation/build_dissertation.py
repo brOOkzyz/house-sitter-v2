@@ -38,8 +38,9 @@ FREEZE = FORMAL / "phase7_results_freeze/final_results_summary.json"
 RESULTS_MANIFEST = FORMAL / "phase7_results_freeze/results_manifest.json"
 MANUSCRIPT = OUT / "manuscript.md"
 REFERENCES = OUT / "references.json"
-DOCX = OUT / "final_dissertation.docx"
-PDF = OUT / "final_dissertation.pdf"
+DOCX = OUT / "final_submission.docx"
+PDF = OUT / "final_submission.pdf"
+MANIFEST = OUT / "submission_evidence_manifest.json"
 
 TITLE = (
     "RaPToR-Lite: A Capability-Grounded Natural-Language Task Creation and "
@@ -102,7 +103,7 @@ def replace_citations(text: str, numbers: dict[str, int]) -> str:
         if missing:
             raise SystemExit(f"Unknown citation keys: {missing}")
         seen.update(keys)
-        return "[" + ",".join(str(numbers[k]) for k in keys) + "]"
+        return "[" + ",".join(str(number) for number in sorted({numbers[k] for k in keys})) + "]"
 
     result = re.sub(r"\[cite:([^\]]+)\]", repl, text)
     return result.replace("`", "").replace("--", "–")
@@ -119,6 +120,8 @@ def audit_citations(manuscript: str, refs: list[dict], numbers: dict[str, int]) 
     abstract = manuscript.split("# ABSTRACT", 1)[1].split("# AUTHOR KEYWORDS", 1)[0]
     if "[cite:" in abstract:
         raise SystemExit("Abstract must not contain citations.")
+    if len(numbers) != 60 or sorted(numbers.values()) != list(range(1, 61)):
+        raise SystemExit("Citation numbering must cover exactly 60 unique references.")
 
 
 def write_references_audit(ordered: list[dict], numbers: dict[str, int]) -> None:
@@ -417,19 +420,36 @@ def add_table(doc: Document, path: Path) -> None:
                     run.font.name="Times New Roman"; run.font.size=Pt(6.5 if len(rows[0])>=4 else 7); run.font.bold=(i==0); set_language(run)
             if i==0:
                 shading=OxmlElement("w:shd"); shading.set(qn("w:fill"),"D9D9D9"); cell._tc.get_or_add_tcPr().append(shading)
+    row_pr=table.rows[0]._tr.get_or_add_trPr(); header=OxmlElement("w:tblHeader"); header.set(qn("w:val"),"true"); row_pr.append(header)
 
 
 def reference_text(r: dict) -> str:
-    text=f"{r['authors']}. {r['year']}. {r['title']}. {r['venue']}."
+    def sentence(value: str) -> str:
+        value=value.strip()
+        return value if value.endswith((".", "?", "!")) else value+"."
+    text=f"{sentence(r['authors'])} {r['year']}. {sentence(r['title'])} {sentence(r['venue'])}"
     if r["doi"]: text += f" https://doi.org/{r['doi']}"
     else: text += f" {r['url']} (accessed 10 August 2026)."
-    return text.replace("--", "–")
+    text=text.replace("--", "–")
+    if any(token in text for token in ("et al..", "?.", "!.", "..")):
+        raise SystemExit(f"Bibliography punctuation audit failed for {r['key']}: {text}")
+    return text
 
 
 def add_document_content(doc: Document, manuscript: str, ordered: list[dict], numbers: dict[str,int]) -> tuple[int,int]:
     lines=manuscript.splitlines(); in_body=False; refs_added=False; figure_count=0; table_count=0
+    figure_alt={
+        "figure1_architecture.png": "Architecture flow from constrained natural-language request to planner, capability registry and verifier, resource admission, executor, and the House2D or Create3ROS2 robot backend; language has no direct motion path.",
+        "figure2_house_sitter_pipeline.png": "House-Sitter evidence flow separating WorldGroundTruth and provenance from RobotObservation; only onboard-equivalent observations reach the detector, Digital Twin and feedback.",
+        "figure3_backends.png": "Common RobotBackend contract branching to the House2D experimental backend and Create3ROS2 deployment backend, with ROS 2 graph discovery and an optional Nav2 waypoint provider.",
+        "figure4_rq1.png": "Bar chart of paired RQ1 decision correctness: full system 100.0%, no grounding 80.0%, and no verifier 66.7%, each with 95 percent Wilson intervals.",
+        "figure5_rq2.png": "Horizontal bar chart of RQ2 end-to-end correctness by language form, showing the synonym form as the lowest at 55.0%.",
+        "figure6_rq3.png": "Stacked bar of 300 held-out RQ3 outcomes: 185 completed, 66 safely deferred and 49 safely terminated at a blocked route; 69 blocked-transition events are explained below the bar.",
+        "supp_route_effect.png": "Supplementary paired route-cost effect plot showing full minus route-disabled cost of minus 4.737 units with a 95 percent bootstrap interval excluding zero.",
+        "supp_detection_sensitivity.png": "Supplementary comparison of primary mean per-seed detection F1 of 0.403 and the post-hoc semantic sensitivity value of 0.629, each with bootstrap intervals.",
+    }
     title=doc.add_paragraph(style="Title"); title.alignment=WD_ALIGN_PARAGRAPH.CENTER; title.add_run(TITLE)
-    for text,bold in [("[STUDENT ID REQUIRED]",True),("SEIoT MSc Final Project Report 2026",False),("University College London",False),("Supervisor: Jagmohan Chauhan",False)]:
+    for text,bold in [("[STUDENT ID REQUIRED]",True),("SEIoT MSc Final Project Report 2026",False),("University College London",False)]:
         p=doc.add_paragraph(); p.alignment=WD_ALIGN_PARAGRAPH.CENTER; r=p.add_run(text); r.bold=bold; r.font.name="Times New Roman"; r.font.size=Pt(10); set_language(r)
     for raw in lines:
         line=raw.strip()
@@ -452,7 +472,9 @@ def add_document_content(doc: Document, manuscript: str, ordered: list[dict], nu
         elif line.startswith("[[FIGURE:"):
             payload=line[len("[[FIGURE:"):-2]; rel,caption=payload.split("|",1)
             p=doc.add_paragraph(); p.alignment=WD_ALIGN_PARAGRAPH.CENTER; p.paragraph_format.keep_with_next=True
-            p.add_run().add_picture(str(OUT/rel),width=Inches(3.05)); doc.add_paragraph(caption,style="Caption"); figure_count+=1
+            inline=p.add_run().add_picture(str(OUT/rel),width=Inches(3.05))
+            inline._inline.docPr.set("descr",figure_alt[Path(rel).name])
+            doc.add_paragraph(caption,style="Caption"); figure_count+=1
         elif line.startswith("[[TABLE:"):
             payload=line[len("[[TABLE:"):-2]; rel,caption=payload.split("|",1)
             add_table(doc,OUT/rel); doc.add_paragraph(caption,style="Caption"); table_count+=1
@@ -465,9 +487,34 @@ def add_document_content(doc: Document, manuscript: str, ordered: list[dict], nu
 
 
 def set_core_properties(doc: Document) -> None:
-    cp=doc.core_properties; cp.title=TITLE; cp.subject="UCL SEIoT MSc Final Project Report"; cp.author="Anonymous student ID pending"
+    cp=doc.core_properties; cp.title=TITLE; cp.subject="UCL SEIoT MSc Final Project Report"; cp.author=""; cp.last_modified_by=""
     cp.keywords="natural-language robot programming, capability grounding, ROS 2, Digital Twin, reproducibility"
-    cp.comments="Built directly from the official Dissertation Template 2024.docx"
+    cp.comments=""
+
+
+def sanitise_metadata(path: Path) -> None:
+    """Remove template-derived author and organisation metadata without touching content."""
+    replacements={
+        "docProps/core.xml": ((r"<dc:creator>.*?</dc:creator>","<dc:creator/>"),(r"<cp:lastModifiedBy>.*?</cp:lastModifiedBy>","<cp:lastModifiedBy/>")),
+    }
+    app_properties=(
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        '<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties" '
+        'xmlns:vt="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes">'
+        '<Application>Microsoft Office Word</Application><AppVersion>16.0000</AppVersion><Company/>'
+        '</Properties>'
+    ).encode("utf-8")
+    with zipfile.ZipFile(path) as source, tempfile.NamedTemporaryFile(delete=False,suffix=".docx") as tmp:
+        with zipfile.ZipFile(tmp.name,"w",zipfile.ZIP_DEFLATED) as target:
+            for item in source.infolist():
+                data=source.read(item.filename)
+                if item.filename == "docProps/app.xml":
+                    target.writestr(item,app_properties)
+                    continue
+                for pattern,replacement in replacements.get(item.filename,()):
+                    data=re.sub(pattern,replacement,data.decode("utf-8")).encode("utf-8")
+                target.writestr(item,data)
+    shutil.move(tmp.name,path)
 
 
 def enable_update_fields(doc: Document) -> None:
@@ -493,6 +540,12 @@ def validate_docx(path: Path) -> None:
         for bad in ("SIGCHI Conference Paper Format","Insert Your Subtitle Here","First Author's Name"):
             if bad in xml: raise SystemExit(f"Template example remains: {bad}")
         if "TOC \\o" not in xml: raise SystemExit("TOC field missing")
+        if "w:updateFields" not in archive.read("word/settings.xml").decode("utf-8"):
+            raise SystemExit("Automatic TOC update setting missing")
+        if xml.count('descr="') < 8:
+            raise SystemExit("Figure alternative text missing")
+        if xml.count("w:tblHeader") != 3:
+            raise SystemExit("Table header-row markers missing")
         if xml.count("w:num=\"2\"")==0 and "w:num\" w:val=\"2\"" not in xml:
             # Attribute serialization varies; direct element validation below is authoritative.
             pass
@@ -503,7 +556,7 @@ def build_docx(manuscript: str, ordered: list[dict], numbers: dict[str,int]) -> 
     shutil.copyfile(TEMPLATE,DOCX); DOCX.chmod(0o644)
     doc=Document(DOCX); clear_body(doc); configure_styles(doc); set_columns(doc.sections[0],1)
     figures,tables=add_document_content(doc,manuscript,ordered,numbers)
-    configure_footers(doc); set_core_properties(doc); enable_update_fields(doc); doc.save(DOCX); validate_docx(DOCX)
+    configure_footers(doc); set_core_properties(doc); enable_update_fields(doc); doc.save(DOCX); sanitise_metadata(DOCX); validate_docx(DOCX)
     return figures,tables
 
 
@@ -514,7 +567,7 @@ def report_counts(manuscript: str, numbers: dict[str,int], table_count:int, figu
     report=re.sub(r"\[\[(?:FIGURE|TABLE):[^|]+\|([^\]]+)\]\]",r"\1",report)
     for path in sorted((OUT/"tables").glob("*.csv")):
         report += " " + " ".join(sum(list(csv.reader(path.open())),[]))
-    report += " " + TITLE + " STUDENT ID REQUIRED SEIoT MSc Final Project Report 2026 University College London Supervisor Jagmohan Chauhan TABLE OF CONTENTS"
+    report += " " + TITLE + " STUDENT ID REQUIRED SEIoT MSc Final Project Report 2026 University College London TABLE OF CONTENTS"
     body=rendered.split("# 1. INTRODUCTION",1)[1].split("# ACKNOWLEDGMENTS",1)[0]
     body=re.sub(r"(?m)^#+ .*?$", "", body); body=re.sub(r"\[\[(?:FIGURE|TABLE):.*?\]\]", "", body)
     counts={
@@ -548,7 +601,7 @@ def write_checklist(counts: dict, pdf_ready: bool, pdf_fonts: str="pending") -> 
         "- [x] Directly based on official Dissertation Template 2024.docx",
         "- [x] Letter page size, template margins, single-column front matter and two-column report body retained",
         "- [x] British English, numbered sections, captions below figures/tables, numeric citations",
-        "- [x] RQ1/RQ2/RQ3 results traced to frozen raw logical hashes",
+        "- [x] RQ1/RQ2/RQ3 results traced to formal raw logical hashes",
         "- [x] Pilot excluded; formal results and core unchanged",
         "- [x] Primary RQ3 F1 0.403 retained; 0.629 labelled post-hoc exploratory",
         "- [x] 61.7% mission completion separated from 100% execution-level safe outcome",
@@ -565,7 +618,7 @@ def write_checklist(counts: dict, pdf_ready: bool, pdf_fonts: str="pending") -> 
 
 def write_manifest(counts:dict, refs:list[dict]) -> None:
     artifacts={}
-    for path in sorted(p for p in OUT.rglob("*") if p.is_file() and "__pycache__" not in p.parts and p.name not in {"dissertation_evidence_manifest.json"}):
+    for path in sorted(p for p in OUT.rglob("*") if p.is_file() and "__pycache__" not in p.parts and p.name not in {MANIFEST.name}):
         artifacts[str(path.relative_to(OUT))]=sha256(path)
     data={
         "title":TITLE,"built_from_git_head":BASE_HEAD,"official_template_sha256":TEMPLATE_HASH,
@@ -577,7 +630,7 @@ def write_manifest(counts:dict, refs:list[dict]) -> None:
     }
     canonical=json.dumps(data,sort_keys=True,separators=(",",":"),ensure_ascii=False).encode()
     data["dissertation_evidence_hash"]=hashlib.sha256(canonical).hexdigest()
-    (OUT/"dissertation_evidence_manifest.json").write_text(json.dumps(data,indent=2,sort_keys=True)+"\n")
+    MANIFEST.write_text(json.dumps(data,indent=2,sort_keys=True)+"\n")
 
 
 def finalise_existing() -> None:
@@ -585,6 +638,7 @@ def finalise_existing() -> None:
     figures=len(re.findall(r"(?m)^\[\[FIGURE:",manuscript)); tables=len(re.findall(r"(?m)^\[\[TABLE:",manuscript))
     counts=report_counts(manuscript,numbers,tables,figures,len(refs))
     if not DOCX.exists() or not PDF.exists(): raise SystemExit("Final DOCX/PDF missing")
+    validate_docx(DOCX)
     pdfinfo=subprocess.check_output(["pdfinfo",str(PDF)],text=True)
     pdftext=subprocess.check_output(["pdftotext","-layout",str(PDF),"-"],text=True)
     fonts=subprocess.check_output(["pdffonts",str(PDF)],text=True)
@@ -605,10 +659,11 @@ def finalise_existing() -> None:
         f"- DOCX SHA-256: `{sha256(DOCX)}`.",f"- PDF SHA-256: `{sha256(PDF)}`.",
         f"- PDF pages: `{re.search(r'Pages:\s+(\d+)',pdfinfo).group(1)}`; page size: US Letter.",
         f"- Word counts: abstract {counts['abstract_word_count']}; template-defined report {counts['template_defined_report_word_count']}; approximate main-body prose {counts['approximate_main_body_prose_word_count']}.",
-        "- TOC: refreshed through LibreOffice UNO before PDF export.",
+        "- TOC: automatic Word TOC field in the DOCX; refreshed through LibreOffice UNO in the PDF-export copy.",
         "- PDF fonts: embedded Liberation Sans/Serif and Caladea substitutions recorded in `pdf_fonts.txt`; DOCX declares Arial/Times New Roman.",
         "- Visual inspection: all pages rendered; tables, figures, columns and captions inspected at page and original resolution.",
         "- Formal evidence: pre/post full-directory SHA-256 comparison passed for all 25 files.",
+        "- Anonymity: DOCX core author and last-modified-by fields are blank; only the student-ID placeholder appears on the title page.",
     ]
     (note_dir/"build_report.md").write_text("\n".join(lines)+"\n")
     write_checklist(counts,True,"PASS with Linux substitutions explicitly recorded")
