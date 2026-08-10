@@ -23,6 +23,7 @@ from matplotlib.patches import FancyArrowPatch, FancyBboxPatch
 from docx import Document
 from docx.enum.section import WD_SECTION
 from docx.enum.style import WD_STYLE_TYPE
+from docx.enum.table import WD_TABLE_ALIGNMENT
 from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_BREAK
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
@@ -38,8 +39,8 @@ FREEZE = FORMAL / "phase7_results_freeze/final_results_summary.json"
 RESULTS_MANIFEST = FORMAL / "phase7_results_freeze/results_manifest.json"
 MANUSCRIPT = OUT / "manuscript.md"
 REFERENCES = OUT / "references.json"
-DOCX = OUT / "final_submission.docx"
-PDF = OUT / "final_submission.pdf"
+DOCX = OUT / "final_submission_v3.docx"
+PDF = OUT / "final_submission_v3.pdf"
 MANIFEST = OUT / "submission_evidence_manifest.json"
 
 TITLE = (
@@ -449,8 +450,11 @@ def add_document_content(doc: Document, manuscript: str, ordered: list[dict], nu
         "supp_detection_sensitivity.png": "Supplementary comparison of primary mean per-seed detection F1 of 0.403 and the post-hoc semantic sensitivity value of 0.629, each with bootstrap intervals.",
     }
     title=doc.add_paragraph(style="Title"); title.alignment=WD_ALIGN_PARAGRAPH.CENTER; title.add_run(TITLE)
-    for text,bold in [("[STUDENT ID REQUIRED]",True),("SEIoT MSc Final Project Report 2026",False),("University College London",False)]:
-        p=doc.add_paragraph(); p.alignment=WD_ALIGN_PARAGRAPH.CENTER; r=p.add_run(text); r.bold=bold; r.font.name="Times New Roman"; r.font.size=Pt(10); set_language(r)
+    title_block=doc.add_table(rows=1, cols=1); title_block.alignment=WD_TABLE_ALIGNMENT.CENTER
+    cell=title_block.cell(0,0)
+    for index,(text,style) in enumerate((("25217311","Author Name"),("SEIoT MSc Final Project Report 2026","Author Affiliation"),("University College London","Author Affiliation"),("Supervisor: Jagmohan Chauhan","Author Affiliation"))):
+        p=cell.paragraphs[0] if index == 0 else cell.add_paragraph()
+        p.style=style; p.alignment=WD_ALIGN_PARAGRAPH.CENTER; set_language(p.add_run(text))
     for raw in lines:
         line=raw.strip()
         if not line: continue
@@ -495,7 +499,12 @@ def set_core_properties(doc: Document) -> None:
 def sanitise_metadata(path: Path) -> None:
     """Remove template-derived author and organisation metadata without touching content."""
     replacements={
-        "docProps/core.xml": ((r"<dc:creator>.*?</dc:creator>","<dc:creator/>"),(r"<cp:lastModifiedBy>.*?</cp:lastModifiedBy>","<cp:lastModifiedBy/>")),
+        "docProps/core.xml": (
+            (r"<dc:creator>.*?</dc:creator>","<dc:creator/>"),
+            (r"<cp:lastModifiedBy>.*?</cp:lastModifiedBy>","<cp:lastModifiedBy/>"),
+            (r"<cp:lastPrinted>.*?</cp:lastPrinted>",""),
+            (r"<dcterms:(?:created|modified)[^>]*>.*?</dcterms:(?:created|modified)>",""),
+        ),
     }
     app_properties=(
         '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
@@ -504,12 +513,20 @@ def sanitise_metadata(path: Path) -> None:
         '<Application>Microsoft Office Word</Application><AppVersion>16.0000</AppVersion><Company/>'
         '</Properties>'
     ).encode("utf-8")
+    custom_properties=(
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        '<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/custom-properties" '
+        'xmlns:vt="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes"/>'
+    ).encode("utf-8")
     with zipfile.ZipFile(path) as source, tempfile.NamedTemporaryFile(delete=False,suffix=".docx") as tmp:
         with zipfile.ZipFile(tmp.name,"w",zipfile.ZIP_DEFLATED) as target:
             for item in source.infolist():
                 data=source.read(item.filename)
                 if item.filename == "docProps/app.xml":
                     target.writestr(item,app_properties)
+                    continue
+                if item.filename == "docProps/custom.xml":
+                    target.writestr(item,custom_properties)
                     continue
                 for pattern,replacement in replacements.get(item.filename,()):
                     data=re.sub(pattern,replacement,data.decode("utf-8")).encode("utf-8")
@@ -539,8 +556,9 @@ def validate_docx(path: Path) -> None:
         xml=archive.read("word/document.xml").decode("utf-8")
         for bad in ("SIGCHI Conference Paper Format","Insert Your Subtitle Here","First Author's Name"):
             if bad in xml: raise SystemExit(f"Template example remains: {bad}")
-        if "TOC \\o" not in xml: raise SystemExit("TOC field missing")
-        if "w:updateFields" not in archive.read("word/settings.xml").decode("utf-8"):
+        if "TOC \\o" not in xml and not (xml.count("1. INTRODUCTION") >= 2 and xml.count("APPENDIX B. CLAIM AND DEPLOYMENT BOUNDARIES") >= 2):
+            raise SystemExit("TOC field or materialised TOC missing")
+        if "TOC \\o" in xml and "w:updateFields" not in archive.read("word/settings.xml").decode("utf-8"):
             raise SystemExit("Automatic TOC update setting missing")
         if xml.count('descr="') < 8:
             raise SystemExit("Figure alternative text missing")
@@ -567,7 +585,7 @@ def report_counts(manuscript: str, numbers: dict[str,int], table_count:int, figu
     report=re.sub(r"\[\[(?:FIGURE|TABLE):[^|]+\|([^\]]+)\]\]",r"\1",report)
     for path in sorted((OUT/"tables").glob("*.csv")):
         report += " " + " ".join(sum(list(csv.reader(path.open())),[]))
-    report += " " + TITLE + " STUDENT ID REQUIRED SEIoT MSc Final Project Report 2026 University College London TABLE OF CONTENTS"
+    report += " " + TITLE + " 25217311 SEIoT MSc Final Project Report 2026 University College London Supervisor Jagmohan Chauhan TABLE OF CONTENTS"
     body=rendered.split("# 1. INTRODUCTION",1)[1].split("# ACKNOWLEDGMENTS",1)[0]
     body=re.sub(r"(?m)^#+ .*?$", "", body); body=re.sub(r"\[\[(?:FIGURE|TABLE):.*?\]\]", "", body)
     counts={
@@ -609,7 +627,7 @@ def write_checklist(counts: dict, pdf_ready: bool, pdf_fonts: str="pending") -> 
         f"- [{'x' if pdf_ready else ' '}] DOCX/PDF generation and structural validation: {status}",
         f"- [{'x' if pdf_ready else ' '}] PDF font inspection: {pdf_fonts}",
         "", "## Unresolved submission metadata", "",
-        "- Student ID: replace `[STUDENT ID REQUIRED]` on the title page before submission.",
+        "- Student ID and supervisor name have been populated on the title page.",
         "- No verified video-submission URL exists; the optional template item is omitted.",
         "- DOCX declares Times New Roman and Arial exactly. This Linux host lacks Microsoft fonts; inspect the PDF font report below and perform final export on a licensed Microsoft-font installation if exact embedded/substituted typefaces are required.",
     ]
@@ -659,14 +677,14 @@ def finalise_existing() -> None:
         f"- DOCX SHA-256: `{sha256(DOCX)}`.",f"- PDF SHA-256: `{sha256(PDF)}`.",
         f"- PDF pages: `{re.search(r'Pages:\s+(\d+)',pdfinfo).group(1)}`; page size: US Letter.",
         f"- Word counts: abstract {counts['abstract_word_count']}; template-defined report {counts['template_defined_report_word_count']}; approximate main-body prose {counts['approximate_main_body_prose_word_count']}.",
-        "- TOC: automatic Word TOC field in the DOCX; refreshed through LibreOffice UNO in the PDF-export copy.",
-        "- PDF fonts: embedded Liberation Sans/Serif and Caladea substitutions recorded in `pdf_fonts.txt`; DOCX declares Arial/Times New Roman.",
+        "- TOC: refreshed through LibreOffice UNO and stored as a populated Word-compatible document index; the DOCX and PDF contain the same materialised entries and pagination.",
+        "- PDF fonts: embedded Liberation Serif, Liberation Sans Bold, Caladea Bold, OpenSymbol and Noto Serif; exact Arial/Times New Roman were unavailable on this host. The DOCX still declares Arial/Times New Roman.",
         "- Visual inspection: all pages rendered; tables, figures, columns and captions inspected at page and original resolution.",
-        "- Formal evidence: pre/post full-directory SHA-256 comparison passed for all 25 files.",
-        "- Anonymity: DOCX core author and last-modified-by fields are blank; only the student-ID placeholder appears on the title page.",
+        "- Formal evidence: frozen protocol, analysis and raw logical-hash guards passed; no experiment or formal/pilot/raw evidence write was performed.",
+        "- Anonymity: DOCX core author and last-modified-by fields are blank; the title page contains only the student ID and supervisor name.",
     ]
     (note_dir/"build_report.md").write_text("\n".join(lines)+"\n")
-    write_checklist(counts,True,"PASS with Linux substitutions explicitly recorded")
+    write_checklist(counts,True,"PASS; embedded Linux substitutions recorded, exact Microsoft faces unavailable")
     write_manifest(counts,refs)
     print(json.dumps(counts,indent=2)); print(f"DOCX_SHA256={sha256(DOCX)}"); print(f"PDF_SHA256={sha256(PDF)}")
 
