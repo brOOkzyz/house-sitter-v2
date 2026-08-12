@@ -1,0 +1,10 @@
+metric,designation,estimate,ci_or_effect,raw_source
+mission_completion,primary,0.617,0.561–0.670,raw/rq3.json
+execution_level_safe_outcome,derived safety outcome,1.000,300/300; not mission success,raw/rq3.json
+anomaly_F1_per_seed,primary,0.403,bootstrap95=0.347–0.457,raw/rq3.json
+anomaly_F1_dropout_semantic_mapping,post-hoc exploratory,0.629,delta=0.226; bootstrap95=0.578–0.680,raw/rq3.json
+twin_correctness,primary,0.737,0.684–0.783,raw/rq3.json
+feedback_leakage,primary,0.000,0.000–0.013,raw/rq3.json
+route_cost_full_minus_disabled,primary paired,-4.737,bootstrap95=-5.189–-4.274,raw/rq3.json
+safe_defer_and_counterfactual_prevention,primary counterfactual,0.220,0.177–0.270,raw/rq3.json
+canonical_scientific_replay,integrity,40/40,passed,raw/rq3.json

@@ -1,0 +1,4 @@
+condition,n,decision_accuracy,accuracy_95ci,accept_f1,reject_f1,raw_source
+full_system,240,1.000,0.984–1.000,1.000,1.000,raw/rq1.json
+capability_grounding_ablation,240,0.800,0.745–0.846,0.667,0.800,raw/rq1.json
+verifier_ablation,240,0.667,0.605–0.723,0.545,0.615,raw/rq1.json

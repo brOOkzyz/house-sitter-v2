@@ -12,6 +12,6 @@ Non-goals: a complete RaPToR platform; unrestricted code generation; runtime LLM
 
 Provisional research questions: RQ1 verifier effectiveness; RQ2 natural-language plan reliability; RQ3 randomized House-Sitter case-study reliability.
 
-## Restart audit note
+## Reproducibility boundary
 
-Phase 1 is the authoritative small core checkpoint for the restart. It requires the declared pure-Python dependencies in `requirements-raptor-lite.txt`; this repository does not claim automatic dependency installation. Any future natural-language adapter produces a structured task candidate only and the verifier remains the execution gate. Current task/execution artifacts are simulation-only and are not physical-robot validation.
+The pure-Python dependencies are listed in `requirements-raptor-lite.txt`; `requirements-dev.txt` additionally installs the focused test runner. Any natural-language adapter produces a structured task candidate only and the verifier remains the execution gate. Current task and execution artifacts are simulation-only and are not physical-robot validation.

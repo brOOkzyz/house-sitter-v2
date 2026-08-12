@@ -1,4 +1,0 @@
-Condition,"Correctness, class F1 and paired comparison"
-Full,240/240; 100.0% (95% CI 98.4–100.0); accept/reject F1 1.000/1.000; reference
-No grounding,192/240; 80.0% (95% CI 74.5–84.6); accept/reject F1 0.667/0.800; full effect +20.0 pp; p=7.11e-15; q=1.07e-14
-No verifier,160/240; 66.7% (95% CI 60.5–72.3); accept/reject F1 0.545/0.615; full effect +33.3 pp; p=1.65e-24; q=4.96e-24

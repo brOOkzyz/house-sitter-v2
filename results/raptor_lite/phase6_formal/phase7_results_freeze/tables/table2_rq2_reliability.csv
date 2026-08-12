@@ -1,0 +1,6 @@
+unit,intent_correct,taskspec_exact_match,decision_correct,end_to_end_correct,ci_or_note,raw_source
+micro_320,0.894,0.850,0.984,0.791,Wilson 95% in existing analysis,raw/rq2.json
+macro_40_intent_correct,,,,0.894,bootstrap95=0.831–0.941,raw/rq2.json
+macro_40_taskspec_exact_match,,,,0.850,bootstrap95=0.744–0.944,raw/rq2.json
+macro_40_decision_correct,,,,0.984,bootstrap95=0.966–0.997,raw/rq2.json
+macro_40_end_to_end_correct,,,,0.791,bootstrap95=0.678–0.891,raw/rq2.json

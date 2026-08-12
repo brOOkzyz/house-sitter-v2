@@ -1,0 +1,23 @@
+{
+  "artifacts": {
+    "claim_audit.md": "a2cf3e72f5472bf1666bde311efc4ea313ef31a0638f84eaa7818e9c880cd4e5",
+    "figures/figure1_rq1_ablation.svg": "362daffa8b465a23389183e8fbbc6c81b6c9817d359312d00d176e6c9d3dbac0",
+    "figures/figure2_rq2_language_e2e.svg": "792852fb2dcf7e89eb635a8061305317f88f6e67f7b78c36719f340aa24ba668",
+    "figures/figure3_rq3_outcomes.svg": "9d0a856f91fe1a2b34f210338edf4d7b292e84c063e6e6426549b8ce39bad8ce",
+    "final_results_summary.json": "72bb6f33952dc15513df0b3c6c0269413bd10f8769fc10128b5f1da8849e7add",
+    "tables/supp_rq2_language_forms.csv": "6cb75ebfc24b8410a52484ed96aa5894157a9525ec8dbfa6c7e8ed9ef0bf7981",
+    "tables/supp_rq3_outcomes.csv": "58612fc53201e6366dff5559552b6f31e75cf3f058015fc7ce8f3ed5bbdb227f",
+    "tables/table1_rq1_verifier.csv": "94b2cc6c5f2f8eb25d2f4404bd6e208c3e860939f4fa65cca7eea672be198396",
+    "tables/table2_rq2_reliability.csv": "179cdd2fea5a25381054d1e1f3b55c4c4a2451b269dac19fd0c31412fc999a83",
+    "tables/table3_rq3_heldout.csv": "061eab2c26051086bf9946ed4644a9f48a247a1155b1a260b7bf5f09175ea57b"
+  },
+  "formal_runs_created": 0,
+  "phase": "Phase 7 Results Freeze",
+  "phase6_raw_hashes": {
+    "rq1": "76e4753f367596b3bda762badf2eb9b350779e469ae8e9e7fb520ee0ac055661",
+    "rq2": "c4572ccd180ad454d15725351284497fa6f3118d817b00d283986a81ac89351a",
+    "rq3": "ec9d077491c6e705456d84ce0c46be2bd241bad7eb3420401ef495c3db65e99a"
+  },
+  "primary_metrics_unchanged": true,
+  "results_manifest_hash": "dc249cfff4b8f9bab90173555fb9860f96b22381fee64ff792ad9599e5499dec"
+}

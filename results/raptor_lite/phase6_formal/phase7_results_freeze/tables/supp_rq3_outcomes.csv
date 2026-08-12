@@ -1,0 +1,8 @@
+category,n,rate,raw_source
+mission_completed,185,0.617,raw/rq3.json
+safe_defer,66,0.220,raw/rq3.json
+safe_blocked_route_termination,49,0.163,raw/rq3.json
+genuine_unexpected_or_system_failure,0,0.000,raw/rq3.json
+blocked_transition_total,69,0.230,raw/rq3.json
+blocked_transition_safe_defer,20,0.067,raw/rq3.json
+blocked_transition_safe_termination,49,0.163,raw/rq3.json

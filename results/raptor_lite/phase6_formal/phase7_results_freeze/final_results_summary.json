@@ -1,0 +1,29 @@
+{
+  "analysis_plan_hash": "fc1e1e1e20817435a80c0886715dcb25ce4ee3844e0ecf64f15c7189f34f9594",
+  "blocked_transition_reconciliation": {
+    "mission_completed": 0,
+    "mutually_exclusive_outcome_total": 300,
+    "safe_blocked_route_termination": 49,
+    "safe_defer_before_execution": 20,
+    "total": 69
+  },
+  "claim_audit": "claim_audit.md",
+  "limitations": [
+    "RQ1 safe-repair raw result unavailable",
+    "RQ3 dropout semantic mapping exploratory only"
+  ],
+  "phase": "Phase 7 Results Freeze",
+  "phase6_formal": true,
+  "primary_lock": {
+    "rq3_mission_completion": 0.6166666666666667,
+    "rq3_per_seed_f1": 0.4033333333333333,
+    "rq3_safe_outcome": 1.0,
+    "rq3_sensitivity_is_exploratory": true
+  },
+  "protocol_hash": "25a16e15fc07c2c9d3c76e52de067ca47f09950ac532bbbf1f14e611753c2847",
+  "raw_hashes": {
+    "rq1": "76e4753f367596b3bda762badf2eb9b350779e469ae8e9e7fb520ee0ac055661",
+    "rq2": "c4572ccd180ad454d15725351284497fa6f3118d817b00d283986a81ac89351a",
+    "rq3": "ec9d077491c6e705456d84ce0c46be2bd241bad7eb3420401ef495c3db65e99a"
+  }
+}

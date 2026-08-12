@@ -1,0 +1,2 @@
+# Preserve the byte-hashed published CSV evidence; its source uses CRLF lines.
+results/raptor_lite/phase6_formal/phase7_results_freeze/tables/*.csv whitespace=cr-at-eol

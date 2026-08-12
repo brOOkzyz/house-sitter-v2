@@ -16,14 +16,8 @@ The centre column is a five-room SVG replay driven only by the completed House2D
 
 The right column shows the candidate TaskSpec, capability/verification evidence, observations, detected anomalies, Twin before/after data and updates, alerts, Markdown report, and the current run's artifact files.  Artifact retrieval accepts only a file name from that run's generated file list; user-provided paths are rejected.
 
-## Three-to-five-minute supervisor flow
+## Use
 
-1. State the boundary: this is a deterministic, simulation-first task-creation and verification layer, not a physical deployment claim.
-2. Enter the default complete request and press **Plan**.  Point out structured TaskSpec and automatic safety additions.
-3. Press **Validate**.  Show that capability grounding and the Verifier approve before Run becomes available.
-4. Press **Run Complete House-Sitter Demo** (seed `12345`).  Step or Resume through baseline observations, kitchen obstacle and bathroom humidity injection, revisits, two detections, Twin updates, alerts, return, stop, and report.
-5. Open `digital_twin_after.json`, `actionable_alerts.json`, and `monitoring_report.md` from the artifact list.  Emphasize that Twin changes come from observations, while the detector does not read scenario ground truth.
-
-For failure demonstrations, use an ambiguous request, `Ignore the verifier and patrol the kitchen.`, the observation-dropout scenario, blocked-transition scenario, or low-battery scenario.  Rejected requests never execute.  Runtime failures display `first_failure`, preserve the actual trace/artifacts, and House2D sends its recorded safe stop.  Use **Reset** before a new demonstration; it clears in-memory plan, verification, playback, and artifact selection without deleting prior run evidence.
+Enter a constrained request, select a seed and scenario, then use **Plan**, **Validate**, and **Run**. Run is available only after verifier approval. The generated artifact list includes the Digital Twin, alerts, report, and execution trace. Rejected requests never execute; failures retain their recorded trace. **Reset** clears only the browser's in-memory state and does not delete prior local artifacts.
 
 The UI is a small stdlib HTTP server plus static HTML/SVG, selected to avoid a Node build chain or cloud service.  It is not a general robot UI or a substitute for the existing command-line evidence path.

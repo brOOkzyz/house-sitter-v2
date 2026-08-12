@@ -1,0 +1,9 @@
+form,n,intent_correct,taskspec_exact_match,decision_correct,end_to_end_correct,raw_source
+ambiguity,40,0.850,0.825,1.000,0.775,raw/rq2.json
+canonical,40,0.975,0.875,1.000,0.850,raw/rq2.json
+explicit_order,40,0.950,0.850,0.975,0.825,raw/rq2.json
+paraphrase,40,0.850,0.825,1.000,0.775,raw/rq2.json
+synonym,40,0.650,0.800,0.950,0.550,raw/rq2.json
+unordered_rooms,40,0.975,0.875,1.000,0.850,raw/rq2.json
+unsafe_or_verifier_bypass,40,0.975,0.875,1.000,0.850,raw/rq2.json
+unsupported,40,0.925,0.875,0.950,0.850,raw/rq2.json

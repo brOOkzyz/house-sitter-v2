@@ -1,4 +1,4 @@
-# Internal AI/Codex instructions and handoff notes
+# Internal instructions and handoff notes
 AGENTS.md
 agent.md
 **/AGENTS.md
@@ -16,12 +16,55 @@ __pycache__/
 # Local environment files
 .env
 *.env
+.envrc
+.python-version
+.write_test_tmp
+
+# Build, editor, and operating-system files
+build/
+dist/
+*.egg-info/
+node_modules/
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+
+# Private writing and presentation material
+dissertation/
+*.pptx
+*runbook*.md
+*Runbook*.md
+docs/assets/
+docs/current_plan.md
+docs/final_3d_house_sitter_demo.md
+docs/final_demo_evidence.md
+docs/final_demo_evidence_summary.txt
+docs/project_restart/
+docs/supervisor_demo.md
+docs/supervisor_research_demo.md
+docs/raptor_lite/phase511_refreeze.md
+docs/raptor_lite/phase59_pre_experiment_freeze.md
+screenshots/
+rendered_pages/
+contact_sheets/
+*_screenshot.png
+*_contact_sheet.png
+source_materials/
+references/
 
 # Run artifacts
 logs/
 .venv/
 .venv_raptor_lite/
 artifacts/raptor_lite/
+
+# Local experiment scratch, pilots, and raw/intermediate formal records
+results/raptor_lite/pilot/
+results/raptor_lite/pilot_refreeze_*/
+results/raptor_lite/phase6_formal/*
+!results/raptor_lite/phase6_formal/phase7_results_freeze/
+!results/raptor_lite/phase6_formal/phase7_results_freeze/**
 
 # User-owned offline semantic-area annotation drafts
 local_annotations/*
