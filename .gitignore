@@ -65,6 +65,11 @@ results/raptor_lite/pilot_refreeze_*/
 results/raptor_lite/phase6_formal/*
 !results/raptor_lite/phase6_formal/phase7_results_freeze/
 !results/raptor_lite/phase6_formal/phase7_results_freeze/**
+!results/raptor_lite/phase6_formal/raw/
+results/raptor_lite/phase6_formal/raw/*
+!results/raptor_lite/phase6_formal/raw/rq1.json
+!results/raptor_lite/phase6_formal/raw/rq2.json
+!results/raptor_lite/phase6_formal/raw/rq3.json
 
 # User-owned offline semantic-area annotation drafts
 local_annotations/*

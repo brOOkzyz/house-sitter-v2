@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import subprocess
 import sys
+import os
 from pathlib import Path
 
 import pytest
@@ -10,6 +11,7 @@ from raptor_lite.house_sitter import HouseSitterApplication
 
 
 ROOT = Path(__file__).resolve().parents[2]
+SCRIPT_ENV = {**os.environ, "PYTHONPATH": str(ROOT)}
 
 
 def test_detector_boundary_rejects_ground_truth_and_provenance_fields():
@@ -19,6 +21,6 @@ def test_detector_boundary_rejects_ground_truth_and_provenance_fields():
 
 
 def test_corrected_rq3_randomization_is_consumed_and_observations_are_isolated():
-    result = subprocess.run([sys.executable, str(ROOT / "scripts/phase6_rq3_validity_audit.py"), "audit"], cwd=ROOT, text=True, capture_output=True)
+    result = subprocess.run([sys.executable, str(ROOT / "scripts/phase6_rq3_validity_audit.py"), "audit"], cwd=ROOT, text=True, capture_output=True, env=SCRIPT_ENV)
     assert result.returncode == 0, result.stderr
     assert '"status": "passed"' in result.stdout

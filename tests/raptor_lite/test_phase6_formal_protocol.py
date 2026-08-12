@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[2]
+SCRIPT_ENV = {**os.environ, "PYTHONPATH": str(ROOT)}
 SCRIPT = ROOT / "scripts/phase6_formal.py"
 MATERIALIZER = ROOT / "scripts/phase6_independent_oracle.py"
 COUNTERFACTUALS = ROOT / "scripts/phase6_counterfactuals.py"
@@ -53,7 +55,7 @@ def test_phase6_revision3_oracle_projection_is_a_pure_data_normalizer():
 
 
 def test_phase6_revision2_counterfactual_ablations_are_non_executing_and_distinct():
-    result = subprocess.run([sys.executable, str(COUNTERFACTUALS), "self-test"], cwd=ROOT, text=True, capture_output=True)
+    result = subprocess.run([sys.executable, str(COUNTERFACTUALS), "self-test"], cwd=ROOT, text=True, capture_output=True, env=SCRIPT_ENV)
     assert result.returncode == 0
     assert json.loads(result.stdout) == {"paired_seed_alignment": 400, "rq1_ablation_decisions_differ": True, "resource_counterfactual_non_executing": True, "status": "passed", "unsafe_executor_invocations": 0}
 

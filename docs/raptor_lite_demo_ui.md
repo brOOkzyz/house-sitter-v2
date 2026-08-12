@@ -3,7 +3,7 @@
 Start the localhost-only interface with one command from the repository root:
 
 ```bash
-.venv_raptor_lite/bin/python scripts/run_raptor_lite_demo.py
+python scripts/run_raptor_lite_demo.py
 ```
 
 Open the printed `http://127.0.0.1:8765` address.  The service intentionally rejects non-localhost bind addresses and does not invoke shell commands, ROS, Gazebo, Nav2, AMCL, Webots, or an external LLM.  The page and every run state say **simulation-only** and **physical robot validation not performed**.

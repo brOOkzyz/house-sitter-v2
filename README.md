@@ -60,13 +60,13 @@ To inspect a ROS 2 graph without commanding a robot, see [Create3 deployment not
 The locked protocol and inputs are in `configs/raptor_lite/` and `docs/raptor_lite/phase6_formal_protocol.md`. Validate their integrity with:
 
 ```bash
-python scripts/phase6_formal.py preflight
-python scripts/phase6_replay_addendum.py preflight
-python scripts/phase6_rq3_correction.py preflight
-python scripts/phase6_rq3_corrected_materializer.py audit
+PYTHONPATH=. python scripts/phase6_formal.py preflight
+PYTHONPATH=. python scripts/phase6_replay_addendum.py preflight
+PYTHONPATH=. python scripts/phase6_rq3_correction.py preflight
+PYTHONPATH=. python scripts/phase6_rq3_corrected_materializer.py audit
 ```
 
-The public results pack is [results/raptor_lite/phase6_formal/phase7_results_freeze](results/raptor_lite/phase6_formal/phase7_results_freeze). It contains the final machine-readable summary, tables, figures, claim audit, and SHA-256 manifest. Pilot output, raw run dumps, and intermediate generated records are intentionally excluded; the protocol, seeds, locked inputs, and analysis scripts are retained so the formal evidence can be inspected and regenerated.
+The public results pack is [results/raptor_lite/phase6_formal/phase7_results_freeze](results/raptor_lite/phase6_formal/phase7_results_freeze). It contains the final machine-readable summary, tables, figures, claim audit, and SHA-256 manifest. The matching formal [raw records](results/raptor_lite/phase6_formal/raw) are also published for independent recomputation; pilot output and intermediate generated records remain excluded.
 
 ## Repository layout
 
