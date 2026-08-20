@@ -8,8 +8,8 @@
     "tables/supp_rq2_language_forms.csv": "6cb75ebfc24b8410a52484ed96aa5894157a9525ec8dbfa6c7e8ed9ef0bf7981",
     "tables/supp_rq3_outcomes.csv": "58612fc53201e6366dff5559552b6f31e75cf3f058015fc7ce8f3ed5bbdb227f",
     "tables/table1_rq1_verifier.csv": "94b2cc6c5f2f8eb25d2f4404bd6e208c3e860939f4fa65cca7eea672be198396",
-    "tables/table2_rq2_reliability.csv": "179cdd2fea5a25381054d1e1f3b55c4c4a2451b269dac19fd0c31412fc999a83",
-    "tables/table3_rq3_heldout.csv": "061eab2c26051086bf9946ed4644a9f48a247a1155b1a260b7bf5f09175ea57b"
+    "tables/table2_rq2_reliability.csv": "8e611714f0200b79bab9262c477efe2464047f204c46c1eb4181a8cac4643a7e",
+    "tables/table3_rq3_heldout.csv": "312de3ef0760a805563df5851ef023a25fb422e7a0868d82dd652a8f092ce9b2"
   },
   "formal_runs_created": 0,
   "phase": "Phase 7 Results Freeze",
@@ -19,5 +19,5 @@
     "rq3": "ec9d077491c6e705456d84ce0c46be2bd241bad7eb3420401ef495c3db65e99a"
   },
   "primary_metrics_unchanged": true,
-  "results_manifest_hash": "dc249cfff4b8f9bab90173555fb9860f96b22381fee64ff792ad9599e5499dec"
+  "results_manifest_hash": "3ada4201b78751216aed6a8134a5a7e578ca26318bf5e7650af6fac6c9904387"
 }

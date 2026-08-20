@@ -12,6 +12,7 @@ from raptor_lite.house_sitter import HouseSitterApplication
 
 ROOT = Path(__file__).resolve().parents[2]
 SCRIPT_ENV = {**os.environ, "PYTHONPATH": str(ROOT)}
+PHASE7_MATERIALIZER = ROOT / "scripts/phase7_results_materializer.py"
 
 
 def test_detector_boundary_rejects_ground_truth_and_provenance_fields():
@@ -22,5 +23,11 @@ def test_detector_boundary_rejects_ground_truth_and_provenance_fields():
 
 def test_corrected_rq3_randomization_is_consumed_and_observations_are_isolated():
     result = subprocess.run([sys.executable, str(ROOT / "scripts/phase6_rq3_validity_audit.py"), "audit"], cwd=ROOT, text=True, capture_output=True, env=SCRIPT_ENV)
+    assert result.returncode == 0, result.stderr
+    assert '"status": "passed"' in result.stdout
+
+
+def test_public_phase7_tables_match_frozen_raw_records_and_locked_bootstrap_method():
+    result = subprocess.run([sys.executable, str(PHASE7_MATERIALIZER), "audit"], cwd=ROOT, text=True, capture_output=True, env=SCRIPT_ENV)
     assert result.returncode == 0, result.stderr
     assert '"status": "passed"' in result.stdout
